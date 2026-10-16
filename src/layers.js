@@ -1,3 +1,4 @@
+import { validateInspection } from './cell-inspector.js';
 import { PLAZAS } from './plazas.js';
 import { validateSessionGeoJSON } from './session-data.js';
 import { validateAnalysis } from './territorial-summary.js';
@@ -16,6 +17,7 @@ export function validateCatalog(catalog, { session = false } = {}) {
     } else if (!/^V(0[1-9]|1[0-9]|2[0-3])$/.test(layer.variable) || /^V1[5-8]$/.test(layer.variable)) throw new Error('Variable no permitida en la demostración pública.');
     if (!layer.approvalReference?.trim() || (session ? layer.sessionApproved !== true : layer.publicApproved !== true || layer.sessionOnly === true)) throw new Error('Falta revisión de publicación o de sesión.');
     if (layer.analysis) validateAnalysis(layer.analysis);
+    if (layer.inspection) validateInspection(layer.inspection);
     if (layer.scope !== undefined && !['city', 'municipality', 'metro_analysis', 'metro_official'].includes(layer.scope)) throw new Error('Ámbito territorial inválido.');
     if (!/^data\/[a-zA-Z0-9_/-]+\.geojson$/.test(layer.url) || layer.url.includes('..')) throw new Error('Ruta GeoJSON no permitida.');
     if (!layer.name?.trim() || !layer.legend?.trim() || !layer.style?.color || !Number.isFinite(layer.style.opacity) || layer.style.opacity < 0 || layer.style.opacity > 1) throw new Error('Faltan nombre, leyenda o estilo aprobado.');

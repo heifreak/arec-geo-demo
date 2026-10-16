@@ -143,9 +143,49 @@ try {
     assert.ok((await page.locator('#layer-method').textContent()).length > 20);
     await page.locator('#reference-clear').click();
   }
+  if (process.env.PRIVATE_SAMPLE_PATH && process.env.PRIVATE_DESCRIPTOR_PATH) {
+    // Authorized local-only review. Never log attributes or capture screenshots of private data.
+    const raw = await readFile(process.env.PRIVATE_SAMPLE_PATH);
+    const data = JSON.parse(raw); const descriptorRaw = await readFile(process.env.PRIVATE_DESCRIPTOR_PATH);
+    const descriptor = JSON.parse(descriptorRaw);
+    await page.selectOption('#plaza', descriptor.plaza); await page.selectOption('#scope', descriptor.scope);
+    await page.locator('#session-geojson').setInputFiles({ name: 'private.geojson', mimeType: 'application/geo+json', buffer: raw });
+    await page.locator('#session-descriptor').setInputFiles({ name: 'private-descriptor.json', mimeType: 'application/json', buffer: descriptorRaw });
+    await page.locator('#session-consent').check(); await page.locator('#session-form button[type=submit]').click();
+    await page.waitForFunction(() => document.getElementById('session-status').textContent.includes('SOLO EN MEMORIA'));
+    await page.locator('#capas input[type=checkbox]').check();
+    await page.getByText('Capa visible', { exact: true }).waitFor({ timeout: 120000 });
+    const summary = await page.locator('#summary').textContent();
+    assert.ok(summary.includes(String(data.features.length)));
+    for (const value of new Set(data.features.map(f => f.properties[descriptor.analysis.classField]))) assert.ok(summary.includes(String(value)));
+    // Fly to an interior point of the first regular grid polygon; pick the rendered cell.
+    const ring = data.features[0].geometry.coordinates[0];
+    const lon = ring.slice(0,-1).reduce((a,p)=>a+p[0],0)/(ring.length-1);
+    const lat = ring.slice(0,-1).reduce((a,p)=>a+p[1],0)/(ring.length-1);
+    await page.locator('details').filter({ has: page.locator('#ir-coordenadas') }).evaluate(element => { element.open = true; });
+    await page.fill('#longitud',String(lon)); await page.fill('#latitud',String(lat));
+    await page.locator('#ir-coordenadas button[type=submit]').click(); await page.waitForTimeout(3500);
+    await page.mouse.click(720,480);
+    await page.waitForFunction(() => document.getElementById('cell-inspection').querySelectorAll('dd').length > 0, { timeout: 30000 });
+    const actual = await page.locator('#atributos').textContent();
+    const expectedId = data.features[0].properties[descriptor.analysis.cellIdField];
+    assert.ok(actual.includes(String(expectedId)), 'Picked original private cell');
+    assert.deepEqual(JSON.parse(actual).atributos, data.features[0].properties, 'Inspector preserves every original value');
+    assert.equal(await page.locator('#cell-inspection dd').count(), descriptor.inspection.groups.reduce((n,g)=>n+g.fields.length,0));
+    await page.locator('#session-clear').click();
+    assert.equal(await page.locator('#cell-inspection dd').count(),0);
+    assert.equal(await page.locator('#layer-method').textContent(),'');
+    assert.equal(await page.locator('#layer-legend').textContent(),'');
+    const stored = await page.evaluate(() => ({ ...localStorage }));
+    for (const value of Object.values(stored)) {
+      assert.ok(!value.includes(String(expectedId)));
+      assert.ok(!value.includes(descriptor.analysis.classField));
+    }
+    console.log('PASS revisión privada: archivo íntegro, capa real renderizada, resumen por clases y selección de celda con campos originales. Sin certificar metodología ni cobertura.');
+  }
   assert.equal(requests.some(request => !['GET', 'HEAD'].includes(request.method)), false);
   const artifacts = process.env.ARTIFACT_DIR || '/tmp/arec-browser-artifacts'; await mkdir(artifacts, { recursive: true });
-  await page.screenshot({ path: resolve(artifacts, 'synthetic-test.png') });
+  if (!process.env.PRIVATE_SAMPLE_PATH) await page.screenshot({ path: resolve(artifacts, 'synthetic-test.png') });
   useFixture = false; await page.reload({ waitUntil: 'networkidle' });
   assert.match(await page.locator('#capas').textContent(), /Sin capas/);
   await page.screenshot({ path: resolve(artifacts, 'desktop.png') });
@@ -156,5 +196,5 @@ try {
   for (const id of ['plaza', 'buscar', 'scope']) { const box = await page.locator('#' + id).boundingBox(); assert.ok(box && box.width >= 90 && box.x >= 0 && box.x + box.width <= 390, 'Controles de cabecera utilizables en móvil'); }
   await page.screenshot({ path: resolve(artifacts, 'mobile-inspector.png') });
   assert.deepEqual(errors, []);
-  console.log('PASS Chromium: navegación, búsqueda, GeoJSON sintético bajo demanda, opacidad, respaldo sin token, dibujo/medición, CSV, inspector móvil, muestra privada en memoria resumen de atributos sintéticos, referencia privada declarativa y ámbitos sin fallback ni subida. No valida servicios ion autenticados ni datos AREC reales.');
+  console.log('PASS Chromium: navegación, búsqueda, GeoJSON sintético bajo demanda, opacidad, respaldo sin token, dibujo/medición, CSV, inspector móvil, muestra privada en memoria resumen de atributos sintéticos, referencia privada declarativa y ámbitos sin fallback ni subida. No certifica metodologías, cobertura territorial ni servicios ion autenticados.');
 } finally { await browser?.close(); await new Promise(done => server.close(done)); }

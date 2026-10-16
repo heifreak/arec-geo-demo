@@ -1,3 +1,4 @@
+import { renderCellInspection, verifyInputEvidence } from './cell-inspector.js';
 import { blockedVariable, validateReferencePackage, descriptorFromReference } from './reference-package.js';
 import { originalProperties } from './paint-renderer.js';
 import { layerSummaryRows } from './territorial-summary.js';
@@ -48,7 +49,7 @@ function focusPlaza(code) {
   });
 }
 function changePlaza() {
-  layers.setContext(selector.value, scope()); drawing.clear(); $('atributos').textContent = 'Selecciona una entidad de una capa cargada.'; $('coincidentes').replaceChildren(); $('selected-layer').textContent = 'Ninguna'; $('layer-method').textContent = ''; $('layer-legend').replaceChildren();
+  layers.setContext(selector.value, scope()); drawing.clear(); $('cell-inspection').replaceChildren(); $('atributos').textContent = 'Selecciona una entidad de una capa cargada.'; $('coincidentes').replaceChildren(); $('selected-layer').textContent = 'Ninguna'; $('layer-method').textContent = ''; $('layer-legend').replaceChildren();
   selectedLayerId = null; $('selected-opacity').disabled = true;
   focusPlaza(selector.value); renderLayers(); renderSummary(); renderReferenceTree();
   if (privateReference && selectedLogicalId) {
@@ -113,11 +114,13 @@ function describeEntity(entity) {
   const layer = layers.catalog.layers.find(layer => layers.loaded.get(layer.id)?.entities.contains(entity));
   const fields = originalProperties(entity, layer ?? {}, viewer.clock.currentTime);
   if (layer) selectLayerMetadata(layer);
+  $('cell-inspection').replaceChildren();
+  if (layer?.inspection) renderCellInspection($('cell-inspection'), fields, layer.inspection);
   $('atributos').textContent = JSON.stringify({ elemento: entity.name || entity.id, capa: layer?.name ?? 'Elemento sin capa catalogada', fuente: layer?.source ?? 'No documentada', metodologia: layer?.methodology ?? 'No documentada', fechaCorte: layer?.updatedAt ?? 'No documentada', atributos: fields }, null, 2);
 }
 viewer.selectedEntityChanged.addEventListener(entity => {
   if (entity) describeEntity(entity);
-  else $('atributos').textContent = 'Selecciona una entidad de una capa cargada.';
+  else { $('cell-inspection').replaceChildren(); $('atributos').textContent = 'Selecciona una entidad de una capa cargada.'; }
 });
 // Independent handler: preserves Cesium's native selection and supports coincident layers/3D Tiles.
 const inspect = new C.ScreenSpaceEventHandler(viewer.scene.canvas);
@@ -137,7 +140,7 @@ inspect.setInputAction(event => {
       const snapshot = JSON.stringify(attributes, null, 2);
       const button = document.createElement('button'); button.textContent = 'Edificio / 3D Tiles';
       button.addEventListener('click', () => {
-        $('atributos').textContent = snapshot;
+        $('cell-inspection').replaceChildren(); $('atributos').textContent = snapshot;
       }); choices.append(button);
     }
   }
@@ -236,7 +239,10 @@ $('session-form').addEventListener('submit', async event => {
   try {
     const descriptor = descriptorFile ? JSON.parse(await descriptorFile.text()) : descriptorFromReference(privateReference, selectedLogicalId, selector.value, scope());
     if (descriptor.plaza !== selector.value || (descriptor.scope ?? 'city') !== scope()) throw Error('El descriptor debe corresponder a la plaza y ámbito seleccionados; no hay sustitución silenciosa por ciudad.');
-    const data = JSON.parse(await geoFile.text());
+    const text = await geoFile.text();
+    const data = JSON.parse(text);
+    await verifyInputEvidence(text, data, descriptor.inputEvidence);
+    if (descriptor.plaza !== selector.value || (descriptor.scope ?? 'city') !== scope()) throw Error('El contexto cambió durante la revisión del archivo; vuelve a prepararlo.');
     layers.addSessionLayer({ ...descriptor, sessionApproved: true, publicApproved: false }, data);
     renderLayers(); renderSummary(); renderReferenceTree();
     status.textContent = 'Muestra preparada SOLO EN MEMORIA. Actívala en Capas territoriales. No se ha subido a GitHub ni a un servidor.';
@@ -245,7 +251,8 @@ $('session-form').addEventListener('submit', async event => {
 });
 $('session-clear').addEventListener('click', () => {
   layers.removeSessionLayers(); viewer.selectedEntity = undefined; $('coincidentes').replaceChildren();
-  $('atributos').textContent = 'Selecciona una entidad de una capa cargada.';
+  selectedLayerId = null; $('selected-opacity').disabled = true; $('selected-layer').textContent = 'Ninguna'; $('layer-method').textContent = ''; $('layer-legend').replaceChildren();
+  $('cell-inspection').replaceChildren(); $('atributos').textContent = 'Selecciona una entidad de una capa cargada.';
   renderLayers(); renderSummary(); renderReferenceTree(); $('session-status').textContent = 'Referencias a muestras retiradas de la sesión. No implica borrado seguro de memoria ni de copias descargadas.';
 });
 

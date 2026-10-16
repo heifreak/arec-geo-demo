@@ -2,7 +2,7 @@
 
 ## Única acción solicitada ahora
 
-El HTML de referencia ya se recibió y analizó como texto/AST en el entorno privado, sin ejecutarlo. La especificación rectora también se recibió y contrastó en privado. El siguiente archivo necesario es una **muestra GeoJSON autorizada de celdas V14 de Ciudad Juárez**, mediante **Adjuntar archivos / +** en esta conversación. El adjunto se entrega a la conversación de Codex, no a GitHub; se aplican las políticas de acceso y conservación de tu cuenta/organización. No se promete cifrado de extremo a extremo ni una retención distinta de la plataforma.
+El HTML de referencia ya se recibió y analizó como texto/AST en el entorno privado, sin ejecutarlo. La especificación rectora también se recibió y contrastó en privado. La muestra V14 de Ciudad Juárez ya se recibió para revisión privada. Los archivos siguientes se entregan mediante **Adjuntar archivos / +** en esta conversación. El adjunto se entrega a la conversación de Codex, no a GitHub; se aplican las políticas de acceso y conservación de tu cuenta/organización. No se promete cifrado de extremo a extremo ni una retención distinta de la plataforma.
 
 No cambies permisos de Drive ni hagas públicos sus enlaces. No vuelvas a compartir el ZIP completo. No adjuntes credenciales o tokens. El mecanismo de descarga de esta sesión admite hasta 32 MiB por archivo; preferimos menos de 25 MiB.
 
@@ -18,13 +18,13 @@ Esta carpeta no está en `/workspace/arec-geo-demo` ni bajo el servidor `npm sta
 4. **Grabación del 8 de octubre**: MP4 o WebM original si es menor de 32 MiB. Si es mayor, exporta desde tu editor un clip menor de 25 MiB con el árbol de capas, la selección de una celda y su inspector. Podemos recibir varios clips sucesivos. No es necesario subirlo a un alojamiento público.
 5. **Muestra de Ciudad Juárez**: solo después de revisar autorización y campos. Adjuntar un GeoJSON individual, preferentemente de pocas celdas con atributos originales, más la fecha/fuente y el alcance de la autorización: “solo revisión privada” o “aprobada para demostración pública”. La primera no autoriza commits. Excluir V15–V18 y campos corporativos no autorizados. El nombre del visor V15 no significa que se autorice la variable interna V15.
 
-No se pide entregar los cinco archivos juntos. El HTML V15 y la especificación ya se recibieron; el siguiente archivo necesario es únicamente una muestra GeoJSON autorizada de celdas V14 de Ciudad Juárez.
+No se pide entregar los cinco archivos juntos. El HTML V15 y la especificación ya se recibieron; la muestra V14 de Ciudad Juárez también se recibió para revisión privada. El siguiente archivo se solicita de uno en uno según el bloqueo pendiente.
 
 ## Vista previa de una muestra sin publicarla
 
 El visor ofrece **Muestra privada · solo sesión**, con dos selectores de archivo: GeoJSON y descriptor revisado. El desarrollador preparará ese descriptor después de leer la referencia y la muestra; el usuario no tendrá que escribir JSON ni adivinar nombres/colores.
 
-Los selectores usan la File API del navegador. No envían los archivos al servidor ni al catálogo público. La muestra se valida como GeoJSON WGS84, se limita a 25 MiB y 50 000 entidades, y solo aparece en la plaza indicada en el descriptor. Debe autorizarse explícitamente la revisión de sesión. Los atributos se presentan como texto, las descripciones HTML/simplestyle no emiten solicitudes a partir de esos atributos y no se usan localStorage ni IndexedDB. El navegador sigue conectándose a Cesium/OpenStreetMap y, si se habilita, ion para los servicios cartográficos.
+Los selectores usan la File API del navegador. No envían los archivos al servidor ni al catálogo público. La muestra se valida como GeoJSON WGS84, se limita a 25 MiB y 50 000 entidades, y solo aparece en la plaza indicada en el descriptor. Debe autorizarse explícitamente la revisión de sesión. Los atributos se presentan como texto, las descripciones HTML/simplestyle no emiten solicitudes a partir de esos atributos y las muestras no se guardan en localStorage ni IndexedDB. Cesium puede guardar preferencias de interfaz. El navegador sigue conectándose a Cesium/OpenStreetMap y, si se habilita, ion para los servicios cartográficos.
 
 **Retirar muestras** elimina referencias y entidades de sesión; recargar también elimina ese estado. No garantiza borrado seguro de RAM, de adjuntos conservados por la plataforma o de archivos ya descargados. La exportación CSV/impresión solicita confirmación si hay muestras cargadas; esto es un aviso, no un sistema DLP. El usuario sigue siendo responsable de sus copias locales. No compartir capturas/informes privados como evidencias públicas del PR.
 
@@ -38,3 +38,13 @@ Solo tras una revisión explícita se preparará un derivado con campos/geometr�
 Las definiciones extraídas del HTML y el análisis detallado permanecen en el directorio privado, sin commits. El visor puede leer un paquete JSON de referencia revisado mediante **Referencia privada · árbol original**. No se carga el HTML original como aplicación. El paquete no sigue rutas de datos, no incorpora una lista alternativa de plazas y no autoriza publicación. Las definiciones internas bloqueadas no generan plantillas de carga.
 
 Después de elegir una subcapa de esa referencia, el formulario de muestra puede aplicar su plantilla sin pedir al usuario que escriba un descriptor. Deben coincidir plaza y ámbito; no hay fallback automático a ciudad. Solo se representa la geometría entregada, no se recorta ni genera una malla por cambiar el selector. Los estilos que aún no soporta el renderer se señalan como pendientes en lugar de sustituirlos.
+
+## Comprobar una capa privada revisada
+
+1. Abre la vista previa privada de la rama, selecciona la plaza y el ámbito declarados en el descriptor.
+2. En **Muestra privada · solo sesión**, elige tu GeoJSON original y el descriptor privado preparado por el desarrollador. No es necesario editar JSON.
+3. Autoriza la revisión de sesión, prepara la muestra y actívala en **Capas territoriales**.
+4. Selecciona una celda: el inspector conserva campos originales y puede mostrar notas de interpretación verificadas. El resumen presenta clases del archivo sin reclasificar ni extrapolar.
+5. Retira la muestra al terminar. No se incorpora al catálogo, Git, almacenamiento local ni IndexedDB. Las exportaciones solicitadas expresamente por el usuario pueden contener resultados privados: consérvalas fuera del repositorio.
+
+Una huella SHA-256 incluida en el descriptor vincula su mapeo al archivo revisado. No certifica autoría, completitud ni validez de las reglas de cálculo. Los descriptores y originales temporales bajo `/tmp` deben descargarse por separado si se necesita conservarlos; no se garantiza persistencia entre entornos.
