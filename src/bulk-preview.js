@@ -24,7 +24,7 @@ panel.innerHTML=[
 sourcePanel.prepend(panel);
 $("bulk-dir").setAttribute("webkitdirectory","");
 $("bulk-dir").multiple=true;
-let inventory=[],excluded=0,reference=null,worker=null,generation=0,saving=false;
+let inventory=[],excluded=0,reference=null,worker=null,generation=0,saving=false,pendingReject=null;
 const msg=s=>$("bulk-message").textContent=s;
 function parse(file,index){
  const path=(file.webkitRelativePath||file.name).replace(/\\/g,"/");
@@ -73,7 +73,7 @@ function workerRun(){
   postMessage({accepted,internal:internal.length});
  };
 }
-function abort(){generation++;if(worker){worker.terminate();worker=null;}msg("Operación cancelada; el inventario anterior se conserva.");}
+function abort(){generation++;if(pendingReject){pendingReject(Error("Cancelado"));pendingReject=null;}if(worker){worker.terminate();worker=null;}msg("Operación cancelada; el inventario anterior se conserva.");}
 $("bulk-stop").onclick=abort;
 $("bulk-go").onclick=async()=>{
  const files=Array.from($("bulk-dir").files);
@@ -83,6 +83,7 @@ $("bulk-go").onclick=async()=>{
  const url=URL.createObjectURL(new Blob(["("+workerRun.toString()+")()"],{type:"text/javascript"}));
  try{
   const result=await new Promise((resolve,reject)=>{
+   pendingReject=reject;
    worker=new Worker(url);
    worker.onmessage=event=>{
     if(ticket!==generation){reject(Error("Cancelado"));return;}
@@ -100,7 +101,7 @@ $("bulk-go").onclick=async()=>{
   msg("Inventario completo: "+next.length+" GeoJSON de "+new Set(next.map(x=>x.plaza)).size+" plazas. No se ha cargado ningún archivo al mapa.");
   if($("bulk-permit").checked)await saveLocal(next,ticket);
  }catch(e){if(ticket===generation)msg("Inventario no completado: "+e.message);}
- finally{if(worker){worker.terminate();worker=null;}URL.revokeObjectURL(url);}
+ finally{pendingReject=null;if(worker){worker.terminate();worker=null;}URL.revokeObjectURL(url);}
 };
 function putInput(id,file){
  const d=new DataTransfer();d.items.add(file);$(id).files=d.files;$(id).dispatchEvent(new Event("change"));
