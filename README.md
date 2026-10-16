@@ -31,3 +31,5 @@ Las [primitivas espaciales offline](processing/README.md) comprueban geometría 
 El inspector puede organizar campos mediante un descriptor privado, conservando sus nombres y valores originales. Si el descriptor incluye una huella de entrada, se comprueba antes de aplicar su mapeo. Los conteos del resumen se limitan al archivo cargado; no acreditan cobertura completa.
 
 Para revisar tus archivos desde tu computadora sin rutas internas ni servidor, descarga el HTML nuevo del visor de la rama y sigue la [demostración privada local](docs/private-preview.md). El botón de descarga genera el descriptor en tu navegador a partir de tus archivos locales.
+
+La comparación de capas privadas exige identificadores únicos y geometrías exactas en la misma plaza y ámbito. Muestra valores originales y procedencia temporal declarada; una celda sin registro en una subcapa no se interpreta como valor cero.

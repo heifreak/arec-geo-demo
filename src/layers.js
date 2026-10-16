@@ -18,6 +18,7 @@ export function validateCatalog(catalog, { session = false } = {}) {
     if (!layer.approvalReference?.trim() || (session ? layer.sessionApproved !== true : layer.publicApproved !== true || layer.sessionOnly === true)) throw new Error('Falta revisión de publicación o de sesión.');
     if (layer.analysis) validateAnalysis(layer.analysis);
     if (layer.inspection) validateInspection(layer.inspection);
+    if (layer.temporalEvidence !== undefined && (!Array.isArray(layer.temporalEvidence) || layer.temporalEvidence.length > 100 || layer.temporalEvidence.some(value => typeof value !== 'string'))) throw Error('Evidencia temporal inválida.');
     if (layer.scope !== undefined && !['city', 'municipality', 'metro_analysis', 'metro_official'].includes(layer.scope)) throw new Error('Ámbito territorial inválido.');
     if (!/^data\/[a-zA-Z0-9_/-]+\.geojson$/.test(layer.url) || layer.url.includes('..')) throw new Error('Ruta GeoJSON no permitida.');
     if (!layer.name?.trim() || !layer.legend?.trim() || !layer.style?.color || !Number.isFinite(layer.style.opacity) || layer.style.opacity < 0 || layer.style.opacity > 1) throw new Error('Faltan nombre, leyenda o estilo aprobado.');

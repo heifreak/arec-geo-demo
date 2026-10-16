@@ -1,12 +1,13 @@
 import './app.js';
-import { descriptorFromHTML } from './reference-html.js';
+import { descriptorFromHTML, referenceLayerOptions } from './reference-html.js';
 const details = document.createElement('details'); details.open = true;
 details.innerHTML = `<summary>Demostración privada · archivos de tu computadora</summary>
 <p>Este visor nuevo lee el HTML de referencia como texto; no ejecuta sus scripts. Los archivos se usan en memoria. El mapa y Cesium requieren Internet.</p>
 <form id="local-pilot-form">
 <label>Referencia HTML original<input id="local-reference" type="file" accept=".html,.htm" required></label>
-<label>Capa de celdas GeoJSON<input id="local-cells" type="file" accept=".geojson,.json" required></label>
+<label>Capa de celdas GeoJSON (puedes agregar varias sucesivamente)<input id="local-cells" type="file" accept=".geojson,.json" required></label>
 <label>Variable<select id="local-variable"></select></label>
+<label>Subcapa<select id="local-sublayer"><option value="">Regla categórica detectada por campos</option></select></label>
 <label class="check"><input id="local-consent" type="checkbox" required>Autorizo revisar estos archivos solo en esta sesión</label>
 <p>Selecciona antes la plaza y el ámbito en la barra superior.</p>
 <button type="submit">Preparar capa privada</button></form>
@@ -17,6 +18,14 @@ document.querySelector('.left-panel').prepend(details);
 for (let i = 1; i <= 23; i++) { if (i >= 15 && i <= 18) continue; const option = document.createElement('option'); option.value = 'V' + String(i).padStart(2,'0'); option.textContent = option.value; document.getElementById('local-variable').append(option); }
 document.getElementById('local-variable').value = 'V14';
 document.getElementById('scope').value = 'metro_analysis'; document.getElementById('scope').dispatchEvent(new Event('change'));
+async function refreshSublayers() {
+  const select=document.getElementById('local-sublayer'); select.replaceChildren(new Option('Regla categórica detectada por campos',''));
+  const file=document.getElementById('local-reference').files[0]; if (!file || file.size>2*1024*1024) return;
+  try { for (const option of referenceLayerOptions(await file.text(),document.getElementById('local-variable').value)) select.append(new Option(option.name,option.id)); }
+  catch { document.getElementById('local-status').textContent='No se pudieron leer las opciones; referencia no ejecutada.'; }
+}
+document.getElementById('local-reference').addEventListener('change',refreshSublayers);
+document.getElementById('local-variable').addEventListener('change',refreshSublayers);
 let reviewedDescriptor = null;
 document.getElementById('local-pilot-form').addEventListener('submit', async event => {
   event.preventDefault(); const status = document.getElementById('local-status'); const download = document.getElementById('local-download');
@@ -24,7 +33,7 @@ document.getElementById('local-pilot-form').addEventListener('submit', async eve
   const reference = document.getElementById('local-reference').files[0]; const cells = document.getElementById('local-cells').files[0];
   if (!reference || !cells || !document.getElementById('local-consent').checked) return;
   if (reference.size > 2*1024*1024 || cells.size > 25*1024*1024) { status.textContent = 'Referencia: máximo 2 MiB; muestra: máximo 25 MiB.'; return; }
-  const context = { plaza: document.getElementById('plaza').value, scope: document.getElementById('scope').value, variable: document.getElementById('local-variable').value };
+  const context = { plaza: document.getElementById('plaza').value, scope: document.getElementById('scope').value, variable: document.getElementById('local-variable').value, logicalId: document.getElementById('local-sublayer').value || undefined };
   try {
     status.textContent = 'Leyendo referencias locales sin ejecutarlas…';
     const descriptor = await descriptorFromHTML(await reference.text(), await cells.text(), context);

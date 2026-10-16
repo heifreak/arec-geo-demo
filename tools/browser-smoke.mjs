@@ -223,6 +223,40 @@ try {
     await page.locator('#ir-coordenadas button[type=submit]').click(); await page.waitForTimeout(3500); await page.mouse.click(720,480);
     await page.waitForFunction(()=>document.getElementById('cell-inspection').querySelectorAll('dd').length>0);
     assert.deepEqual(JSON.parse(await page.locator('#atributos').textContent()).atributos,data.features[0].properties);
+    if (process.env.PRIVATE_SECOND_SAMPLE_PATH && process.env.PRIVATE_SECOND_HTML_PATH && process.env.PRIVATE_SECOND_DESCRIPTOR_PATH) {
+      const secondData=JSON.parse(await readFile(process.env.PRIVATE_SECOND_SAMPLE_PATH,'utf8'));
+      const secondDescriptor=JSON.parse(await readFile(process.env.PRIVATE_SECOND_DESCRIPTOR_PATH,'utf8'));
+      await page.selectOption('#local-variable',secondDescriptor.variable);
+      await page.locator('#local-reference').setInputFiles(process.env.PRIVATE_SECOND_HTML_PATH);
+      await page.waitForFunction(id=>[...document.getElementById('local-sublayer').options].some(o=>o.value===id),secondDescriptor.name);
+      await page.selectOption('#local-sublayer',secondDescriptor.name);
+      await page.locator('#local-cells').setInputFiles(process.env.PRIVATE_SECOND_SAMPLE_PATH);
+      await page.locator('#local-consent').check(); await page.locator('#local-pilot-form button[type=submit]').click();
+      await page.waitForFunction(()=>document.querySelectorAll('#capas fieldset').length===2);
+      await page.locator('#capas fieldset').last().locator('input[type=checkbox]').check();
+      await page.waitForFunction(()=>[...document.querySelectorAll('#capas fieldset')].every(f=>f.textContent.includes('Capa visible')),null,{timeout:120000});
+      assert.equal(await page.locator('#capas input[type=checkbox]:checked').count(),2);
+      const flyPick=async feature=>{
+        const points=feature.geometry.coordinates[0].slice(0,-1);
+        await page.fill('#longitud',String(points.reduce((n,p)=>n+p[0],0)/points.length)); await page.fill('#latitud',String(points.reduce((n,p)=>n+p[1],0)/points.length));
+        await page.locator('#ir-coordenadas button[type=submit]').click(); await page.waitForTimeout(3500); await page.mouse.click(720,480);
+      };
+      await flyPick(secondData.features[0]);
+      await page.waitForFunction(()=>document.querySelectorAll('#cell-comparison [data-comparison-status="matched"]').length===2);
+      const joined=await page.locator('#cell-comparison section pre').allTextContents();
+      const sharedId=secondData.features[0].properties[secondDescriptor.analysis.cellIdField];
+      const baseMatch=data.features.find(f=>f.properties[expected.analysis.cellIdField]===sharedId);
+      assert.ok(baseMatch); const expectedRows=[baseMatch.properties,secondData.features[0].properties];
+      assert.equal(joined.length,2); for (let i=0;i<2;i++)assert.deepEqual(JSON.parse(joined[i]),expectedRows[i]);
+      assert.ok((await page.locator('#cell-comparison').textContent()).includes(secondDescriptor.temporalEvidence[0]));
+      const secondIds=new Set(secondData.features.map(f=>f.properties[secondDescriptor.analysis.cellIdField]));
+      const absent=data.features.find(f=>!secondIds.has(f.properties[expected.analysis.cellIdField]));
+      assert.ok(absent); await flyPick(absent);
+      await page.waitForFunction(()=>document.querySelectorAll('#cell-comparison [data-comparison-status="no-record"]').length===1);
+      assert.equal(await page.locator('#cell-comparison [data-comparison-status="no-record"] pre').count(),0);
+      assert.match(await page.locator('#cell-comparison').textContent(),/no equivale a cero/);
+      console.log('PASS comparación privada simultánea: dos capas reales, ID y geometría verificados, todos los atributos originales, procedencia temporal declarada y ausencia sin cero inventado.');
+    }
     await page.locator('#local-clear').click(); assert.equal(await page.locator('#local-download').isDisabled(),true);
     await page.reload({waitUntil:'networkidle'}); assert.match(await page.locator('#capas').textContent(),/Sin capas/);
     assert.equal(requests.some(r=>!['GET','HEAD'].includes(r.method)),false);

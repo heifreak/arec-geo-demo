@@ -17,3 +17,5 @@
 - Keep PR #1 in draft; do not mark ready, merge or publish before the owner validates the pilot preview.
 
 - Original catalog, paths, palettes, thresholds, assumptions and detailed audit stay in the private intake. Public code may implement generic declarative rendering and session import; do not commit recovered definition bundles or corporate parameters. Do not confuse a visual rule with an approved analytical model.
+
+- The V13 metropolitan sample has also been received privately. Preserve its declared temporal evidence: estimated/projected epochs are not observations. Compare visible private layers only by unique typed identifiers plus exact original geometry and matching context; missing records never imply zero. The next needed reference is the original V13 GHSL processing script/notebook, not more invented parameters.

@@ -25,3 +25,23 @@ test('no evalúa llamadas dinámicas para conseguir una pintura',async()=>{
  const dynamic='<script>map.addLayer(secretFunction());</script>';
  await assert.rejects(descriptorFromHTML(dynamic,JSON.stringify(data),context),/única/);
 });
+const uniformHTML=`<script>
+const registry={variables:[{id:1,subcapas:[{id:'synthetic_uniform',nombre:'Synthetic uniform'}]}]};
+const methods={synthetic_uniform:${JSON.stringify(meta)}};
+function colorFor(id){const colors={synthetic_uniform:'#123456'};return colors[id]||'#000000';}
+function loadLayer(id){const c=colorFor(id);
+map.addLayer({id:'fill',source:'uniform',type:'fill',paint:{'fill-color':c,'fill-opacity':0.4}});
+map.addLayer({id:'line',source:'uniform',type:'line',paint:{'line-color':c,'line-width':1}});}
+globalThis.__uniformExecuted=true;</script>`;
+test('recupera constructor uniforme literal y procedencia sin ejecutar funciones',async()=>{
+ const sample=structuredClone(data);sample.features[0].properties.test_temporal='GHSL synthetic estimated epoch';
+ const d=await descriptorFromHTML(uniformHTML,JSON.stringify(sample),{...context,variable:'V01',logicalId:'synthetic_uniform'});
+ assert.equal(d.style.paint['fill-color'],'#123456');assert.equal(d.style.paint['line-width'],1);
+ assert.equal(globalThis.__uniformExecuted,undefined);assert.equal(d.analysis.classField,undefined);
+ assert.deepEqual(d.temporalEvidence,['GHSL synthetic estimated epoch']);
+});
+test('rechaza lookup con efectos y pinturas uniformes contradictorias',async()=>{
+ await assert.rejects(descriptorFromHTML(uniformHTML.replace("return colors[id]", "danger();return colors[id]"),JSON.stringify(data),{...context,variable:'V01',logicalId:'synthetic_uniform'}));
+ const conflicting=uniformHTML.replace("'line-width':1", "'line-width':1").replace("globalThis.__uniformExecuted=true;", "function another(id){const c=colorFor(id);map.addLayer({id:'other',source:'uniform',type:'fill',paint:{'fill-color':c,'fill-opacity':0.9}});}");
+ await assert.rejects(descriptorFromHTML(conflicting,JSON.stringify(data),{...context,variable:'V01',logicalId:'synthetic_uniform'}),/contradictorias/);
+});

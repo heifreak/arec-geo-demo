@@ -1,3 +1,4 @@
+import { compareCell, renderCellComparison } from './cell-comparison.js';
 import { renderCellInspection, verifyInputEvidence } from './cell-inspector.js';
 import { blockedVariable, validateReferencePackage, descriptorFromReference } from './reference-package.js';
 import { originalProperties } from './paint-renderer.js';
@@ -49,7 +50,7 @@ function focusPlaza(code) {
   });
 }
 function changePlaza() {
-  layers.setContext(selector.value, scope()); drawing.clear(); $('cell-inspection').replaceChildren(); $('atributos').textContent = 'Selecciona una entidad de una capa cargada.'; $('coincidentes').replaceChildren(); $('selected-layer').textContent = 'Ninguna'; $('layer-method').textContent = ''; $('layer-legend').replaceChildren();
+  layers.setContext(selector.value, scope()); drawing.clear(); $('cell-comparison').replaceChildren(); $('cell-inspection').replaceChildren(); $('atributos').textContent = 'Selecciona una entidad de una capa cargada.'; $('coincidentes').replaceChildren(); $('selected-layer').textContent = 'Ninguna'; $('layer-method').textContent = ''; $('layer-legend').replaceChildren();
   selectedLayerId = null; $('selected-opacity').disabled = true;
   focusPlaza(selector.value); renderLayers(); renderSummary(); renderReferenceTree();
   if (privateReference && selectedLogicalId) {
@@ -114,13 +115,19 @@ function describeEntity(entity) {
   const layer = layers.catalog.layers.find(layer => layers.loaded.get(layer.id)?.entities.contains(entity));
   const fields = originalProperties(entity, layer ?? {}, viewer.clock.currentTime);
   if (layer) selectLayerMetadata(layer);
-  $('cell-inspection').replaceChildren();
+  $('cell-comparison').replaceChildren(); $('cell-inspection').replaceChildren();
   if (layer?.inspection) renderCellInspection($('cell-inspection'), fields, layer.inspection);
+  if (layer?.analysis && layers.sessionInputs.has(layer.id)) {
+    try {
+      const targets = layers.catalog.layers.filter(item => layers.loaded.get(item.id)?.show && layers.sessionInputs.has(item.id)).map(item => ({ layer: item, data: layers.sessionInputs.get(item.id) }));
+      renderCellComparison($('cell-comparison'), compareCell({ layer, properties: fields, data: layers.sessionInputs.get(layer.id) }, targets));
+    } catch (error) { $('cell-comparison').textContent = `Comparación no disponible: ${error.message}`; }
+  }
   $('atributos').textContent = JSON.stringify({ elemento: entity.name || entity.id, capa: layer?.name ?? 'Elemento sin capa catalogada', fuente: layer?.source ?? 'No documentada', metodologia: layer?.methodology ?? 'No documentada', fechaCorte: layer?.updatedAt ?? 'No documentada', atributos: fields }, null, 2);
 }
 viewer.selectedEntityChanged.addEventListener(entity => {
   if (entity) describeEntity(entity);
-  else { $('cell-inspection').replaceChildren(); $('atributos').textContent = 'Selecciona una entidad de una capa cargada.'; }
+  else { $('cell-comparison').replaceChildren(); $('cell-inspection').replaceChildren(); $('atributos').textContent = 'Selecciona una entidad de una capa cargada.'; }
 });
 // Independent handler: preserves Cesium's native selection and supports coincident layers/3D Tiles.
 const inspect = new C.ScreenSpaceEventHandler(viewer.scene.canvas);
@@ -140,7 +147,7 @@ inspect.setInputAction(event => {
       const snapshot = JSON.stringify(attributes, null, 2);
       const button = document.createElement('button'); button.textContent = 'Edificio / 3D Tiles';
       button.addEventListener('click', () => {
-        $('cell-inspection').replaceChildren(); $('atributos').textContent = snapshot;
+        $('cell-comparison').replaceChildren(); $('cell-inspection').replaceChildren(); $('atributos').textContent = snapshot;
       }); choices.append(button);
     }
   }
@@ -157,7 +164,7 @@ function renderLayers() {
     const label = document.createElement('label'); label.append(toggle, document.createTextNode(' Mostrar capa'));
     const opacity = document.createElement('input'); opacity.type = 'range'; opacity.min = 0; opacity.max = 1; opacity.step = 0.05; opacity.value = layers.opacities.get(layer.id) ?? layer.style.opacity; opacity.setAttribute('aria-label', `Opacidad de ${layer.name}`);
     const metadata = document.createElement('button'); metadata.textContent = 'Leyenda y metodología'; metadata.type = 'button'; metadata.addEventListener('click', () => selectLayerMetadata(layer));
-    const status = document.createElement('p'); const symbols = document.createElement('p'); symbols.textContent = layer.legend;
+    const status = document.createElement('p'); status.textContent = layers.loaded.has(layer.id) ? (toggle.checked ? 'Capa visible' : 'Capa oculta') : 'Preparada; actívala para cargar.'; const symbols = document.createElement('p'); symbols.textContent = layer.legend;
     const frame = document.createElement('button'); frame.type = 'button'; frame.textContent = 'Encuadrar capa'; frame.disabled = !toggle.checked;
     frame.addEventListener('click', async () => {
       const source = layers.loaded.get(layer.id);
@@ -169,7 +176,7 @@ function renderLayers() {
       toggle.disabled = true; status.textContent = 'Cargando…';
       try { await layers.setVisible(layer.id, toggle.checked); layers.setOpacity(layer.id, Number(opacity.value)); status.textContent = toggle.checked ? 'Capa visible' : 'Capa oculta'; }
       catch { toggle.checked = false; status.textContent = 'No se pudo cargar la capa. Revisa el archivo y la conexión.'; }
-      finally { toggle.disabled = false; frame.disabled = !toggle.checked; renderSummary(); renderReferenceTree(); }
+      finally { toggle.disabled = false; frame.disabled = !toggle.checked; renderSummary(); renderReferenceTree(); if (viewer.selectedEntity) describeEntity(viewer.selectedEntity); }
     });
     opacity.addEventListener('input', () => { layers.setOpacity(layer.id, Number(opacity.value)); if (selectedLayerId === layer.id) $('selected-opacity').value = opacity.value; });
     if (layer.style.paint) { opacity.setAttribute('aria-label', `Intensidad sobre simbología original de ${layer.name}`); }
@@ -252,7 +259,7 @@ $('session-form').addEventListener('submit', async event => {
 $('session-clear').addEventListener('click', () => {
   layers.removeSessionLayers(); viewer.selectedEntity = undefined; $('coincidentes').replaceChildren();
   selectedLayerId = null; $('selected-opacity').disabled = true; $('selected-layer').textContent = 'Ninguna'; $('layer-method').textContent = ''; $('layer-legend').replaceChildren();
-  $('cell-inspection').replaceChildren(); $('atributos').textContent = 'Selecciona una entidad de una capa cargada.';
+  $('cell-comparison').replaceChildren(); $('cell-inspection').replaceChildren(); $('atributos').textContent = 'Selecciona una entidad de una capa cargada.';
   renderLayers(); renderSummary(); renderReferenceTree(); $('session-status').textContent = 'Referencias a muestras retiradas de la sesión. No implica borrado seguro de memoria ni de copias descargadas.';
 });
 
@@ -261,7 +268,7 @@ function selectLayerMetadata(layer) {
   selectedLayerId = target?.id ?? null; $('selected-opacity').disabled = !target || !layers.loaded.has(target.id);
   $('selected-opacity').value = target ? layers.opacities.get(target.id) ?? target.style.opacity : 1;
   $('selected-layer').textContent = layer.name;
-  $('layer-method').textContent = [layer.source ? `Fuente: ${layer.source}` : 'Fuente no documentada', layer.methodology ? `Método: ${layer.methodology}` : 'Método no documentado', layer.formula ? `Regla declarada: ${layer.formula}` : 'Sin regla adicional documentada', `Ámbito: ${scope()}`, ...(layer.warnings ?? [])].join('\n\n');
+  $('layer-method').textContent = [layer.source ? `Fuente: ${layer.source}` : 'Fuente no documentada', layer.methodology ? `Método: ${layer.methodology}` : 'Método no documentado', layer.formula ? `Regla declarada: ${layer.formula}` : 'Sin regla adicional documentada', `Ámbito: ${scope()}`, ...(layer.temporalEvidence ?? []).map(value => `Fuente temporal declarada: ${value}`), ...(layer.warnings ?? [])].join('\n\n');
   const legend = $('layer-legend'); legend.replaceChildren();
   const entries = layer.legendEntries ?? layer.style?.categories?.map(item => [item.color, item.label]) ?? [];
   for (const [color, text] of entries) {
