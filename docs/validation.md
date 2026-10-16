@@ -37,3 +37,14 @@ El resultado es una base funcional ampliada y probada con datos sintéticos, no 
 - No se reintentaron enlaces Drive/Docs bloqueados.
 
 **Criterio de entrega del piloto todavía NO cumplido:** falta una capa auténtica autorizada y la referencia V15 para comprobar campos, leyendas, reglas y resultados. No se declara integrada la malla 500 × 500 m ni V13, V14 o V20 por implementar el lector. Los resúmenes reales se habilitarán con sus campos y reglas documentados; hoy solo se validaron con datos de prueba. El streaming ion autenticado sigue pendiente de la cuenta/token del propietario en el formulario de sesión, nunca por chat.
+
+## Fase de adaptación declarativa de referencia privada
+
+El archivo de referencia se recibió mediante el mecanismo privado, con integridad verificada; se analizó como texto y AST. No se ejecutaron HTML ni JavaScript originales, no se siguieron sus enlaces y no se copiaron las definiciones o el análisis detallado al repositorio. Los artefactos privados y sus comprobaciones de compatibilidad quedan en la entrada privada.
+
+- `npm test`: **33 pruebas aprobadas**, sin fallos ni omisiones. Añaden validación del paquete de referencia, intérprete restringido de estilos, geometrías con contornos sobre terreno, símbolos de puntos, preservación de opacidades y aislamiento de ámbitos.
+- La prueba Chromium se amplía para leer paquetes de referencia en memoria, elegir una plantilla sin escribir JSON, renderizar una muestra poligonal sintética con simbología declarativa y cambiar de ámbito sin fallback urbano. Mantiene los recorridos anteriores y verifica que no hay subidas.
+- El parámetro opcional `PRIVATE_REFERENCE_PATH` permite comprobar un paquete local ya revisado, sin imprimir su contenido ni incluirlo como fixture del repositorio. No se ejecuta el HTML original; las capturas finales se toman después de retirar los metadatos privados.
+- Las comprobaciones de reglas visuales no validan las metodologías como modelos aprobados, ni demuestran datos auténticos, equivalencia visual exacta entre motores, disponibilidad de todas las fuentes o autenticación ion. El piloto territorial real sigue pendiente.
+
+El siguiente documento solicitado es exclusivamente la Especificación Técnica Rectora del 14 de octubre. No se reintentan enlaces bloqueados ni se marca el PR como listo.

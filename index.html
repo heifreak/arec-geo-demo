@@ -16,6 +16,7 @@
     <div class="plaza-controls">
       <label for="plaza">Plaza oficial <select id="plaza" aria-label="Seleccionar plaza"></select></label>
       <label for="buscar">Buscar plaza <input id="buscar" type="search" placeholder="Nombre o código" autocomplete="off"></label>
+      <label for="scope">Ámbito territorial<select id="scope"><option value="city">Ciudad</option><option value="municipality">Municipio central</option><option value="metro_analysis">Metrópoli · análisis</option><option value="metro_official">Metrópoli · oficial</option></select></label>
     </div>
     <div class="context"><span class="badge">DEMOSTRACIÓN PÚBLICA</span><p id="estado" role="status">Preparando visor…</p><small id="resultados-busqueda" aria-live="polite">18 plazas oficiales · Sin Delicias</small><button id="toggle-inspector" aria-expanded="false">Inspector / estatus</button></div>
   </header>
@@ -31,6 +32,7 @@
       <p id="buildings-status" class="muted" role="status">Edificios desactivados. Cobertura según proveedor.</p>
       <button id="verify-3d" type="button">Comprobar vista 3D actual</button>
       <pre id="verify-3d-status" role="status">Sin comprobación de terreno ni edificios reales.</pre>
+      <div class="button-grid"><button id="view-world" type="button">Ver globo</button><button id="view-plazas" type="button">Ver las 18 plazas</button></div>
       <details class="subdetails"><summary>Conectar Cesium ion</summary>
         <p class="muted">Usa solo un token de visualización con permiso assets:read. Se conserva en memoria durante esta sesión; no se guarda ni se envía al repositorio.</p>
         <form id="ion-form"><label for="ion-token">Token de visualización <input id="ion-token" type="password" autocomplete="off" spellcheck="false"></label><button type="submit">Aplicar a esta sesión</button></form>
@@ -41,12 +43,23 @@
       <form id="ir-coordenadas"><label for="longitud">Longitud WGS84<input id="longitud" type="number" min="-180" max="180" step="any" required></label><label for="latitud">Latitud WGS84<input id="latitud" type="number" min="-90" max="90" step="any" required></label><button type="submit">Enfocar ubicación</button></form>
       <p class="muted">Búsqueda de direcciones pendiente de proveedor autorizado.</p>
     </details>
-    <details open><summary>Capas territoriales</summary><div id="capas" aria-live="polite">Leyendo catálogo…</div></details>
+    <details><summary>Referencia privada · árbol original</summary>
+      <form id="reference-form">
+        <label for="reference-file">Paquete de referencia revisado (JSON)<input id="reference-file" type="file" accept=".json" required></label>
+        <label class="check"><input id="reference-consent" type="checkbox" required> Autorizado para revisar en esta sesión privada</label>
+        <button type="submit">Leer referencia en memoria</button>
+      </form>
+      <button id="reference-clear" type="button">Retirar referencia</button>
+      <p id="reference-status" class="muted" role="status">El desarrollador prepara este paquete de datos; no ejecutes ni cargues el HTML original como aplicación.</p>
+      <label for="layer-search">Buscar variable o subcapa<input id="layer-search" type="search" placeholder="Buscar en la referencia cargada"></label>
+      <div id="reference-tree"></div>
+    </details>
+    <details open><summary>Capas territoriales · ámbito actual</summary><p class="muted">Cambiar de ámbito retira sus entidades cargadas. No se sustituyen capas metropolitanas por capas de ciudad.</p><div id="capas" aria-live="polite">Leyendo catálogo…</div></details>
     <details><summary>Muestra privada · solo sesión</summary>
       <p class="muted">Los archivos se leen en este navegador; no se suben al servidor. El descriptor lo preparará el desarrollador desde la referencia V15. No sustituye la autorización para publicar.</p>
       <form id="session-form">
         <label for="session-geojson">Muestra GeoJSON de la plaza seleccionada<input id="session-geojson" type="file" accept=".geojson,.json" required></label>
-        <label for="session-descriptor">Descriptor revisado de campos y simbología<input id="session-descriptor" type="file" accept=".json" required></label>
+        <label for="session-descriptor">Descriptor revisado (opcional si elegiste subcapa en la referencia)<input id="session-descriptor" type="file" accept=".json"></label>
         <label class="check"><input id="session-consent" type="checkbox" required> Autorizada para revisión en esta sesión privada</label>
         <button type="submit">Preparar muestra en memoria</button>
       </form>
@@ -58,11 +71,12 @@
       <p id="drawing-status" role="status">Dibujos locales; no se guardan ni se publican.</p>
       <p class="muted">Mediciones esféricas aproximadas sobre polígonos simples. No son superficies catastrales ni mediciones sobre el relieve.</p>
     </details>
-    <details><summary>Capacidades pendientes</summary><p class="muted">Ámbito metropolitano, variables y simbología V14/V15: requieren referencias y datos. T1/T2/T3, multicriterio y Balance de Tierra REC: pendientes de reglas y validación. No se ejecutan cálculos de oportunidad.</p></details>
+    <details><summary>Capacidades pendientes</summary><p class="muted">Geometrías metropolitanas, variables y resultados: requieren datos y revisión de referencias. T1/T2/T3, multicriterio y Balance de Tierra REC: pendientes de reglas y validación. No se ejecutan cálculos de oportunidad.</p></details>
   </aside>
   <aside class="panel right-panel" aria-label="Inspector territorial y estatus">
     <p class="eyebrow">INTELIGENCIA TERRITORIAL</p><h2>Inspector</h2>
     <p class="muted">Selecciona un elemento del mapa. Si coinciden varias capas, elige un elemento.</p>
+    <details open><summary>Fuente, leyenda y metodología</summary><h3 id="selected-layer">Ninguna</h3><label for="selected-opacity">Intensidad de la capa cargada<input id="selected-opacity" type="range" min="0" max="1" step="0.05" value="1" disabled></label><div id="active-layers" class="button-grid" aria-label="Capas activas"></div><div id="layer-legend"></div><pre id="layer-method"></pre></details>
     <div id="coincidentes" class="button-grid"></div><pre id="atributos">Selecciona una entidad de una capa cargada.</pre>
     <details open class="report"><summary>Estatus de la plaza</summary>
       <p class="muted">Inventario y resúmenes de atributos de capas cargadas, incluidas muestras privadas si las activas. No equivale a cobertura completa de la plaza.</p>

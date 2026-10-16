@@ -38,8 +38,9 @@ export function summarizeCells(rows, analysis) {
 
 export function layerSummaryRows(layer, source, time, originalRows) {
   const prefix = `${layer.variable} · ${layer.name}`;
-  const rows = originalRows ?? source.entities.values.map(entity => entity.properties?.getValue(time) ?? {});
-  const result = [[`${prefix} · entidades cargadas`, source.entities.values.length], [`${prefix} · visibilidad`, source.show === false ? 'Oculta; atributos siguen cargados' : 'Visible'], [`${prefix} · alcance`, layer.analysis?.scope === 'plaza' ? 'Plaza declarada; cobertura requiere revisión' : 'Muestra / alcance no completo'], [`${prefix} · fecha de corte`, layer.updatedAt || 'No documentada']];
+  const features = source.entities.values.filter(entity => !entity._arecParent);
+  const rows = originalRows ?? features.map(entity => entity.properties?.getValue(time) ?? {});
+  const result = [[`${prefix} · entidades cargadas`, features.length], [`${prefix} · visibilidad`, source.show === false ? 'Oculta; atributos siguen cargados' : 'Visible'], [`${prefix} · alcance`, layer.analysis?.scope === 'plaza' ? 'Plaza declarada; cobertura requiere revisión' : 'Muestra / alcance no completo'], [`${prefix} · fecha de corte`, layer.updatedAt || 'No documentada']];
   if (!layer.analysis) { result.push([`${prefix} · resultados por celda`, 'Sin mapeo rector: no se infieren campos ni cálculos']); return result; }
   try {
     const summary = summarizeCells(rows, layer.analysis);

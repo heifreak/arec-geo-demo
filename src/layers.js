@@ -1,6 +1,8 @@
 import { PLAZAS } from './plazas.js';
 import { validateSessionGeoJSON } from './session-data.js';
 import { validateAnalysis } from './territorial-summary.js';
+import { validatePaint } from './style-expressions.js';
+import { applyPaint } from './paint-renderer.js';
 
 export function validateCatalog(catalog, { session = false } = {}) {
   if (catalog?.version !== 1 || !Array.isArray(catalog.layers)) throw new Error('Catálogo no compatible.');
@@ -9,12 +11,16 @@ export function validateCatalog(catalog, { session = false } = {}) {
     if (!layer.id || ids.has(layer.id)) throw new Error('Identificador de capa ausente o duplicado.');
     ids.add(layer.id);
     if (!Object.hasOwn(PLAZAS, layer.plaza)) throw new Error('Plaza no autorizada.');
-    if (!/^V(0[1-9]|1[0-9]|2[0-3])$/.test(layer.variable) || /^V1[5-8]$/.test(layer.variable)) throw new Error('Variable no permitida en la demostración pública.');
+    if (layer.kind === 'base') {
+      if (!['grid', 'ageb', 'extent', 'municipalities'].includes(layer.role) || layer.variable !== 'BASE') throw new Error('Base territorial inválida.');
+    } else if (!/^V(0[1-9]|1[0-9]|2[0-3])$/.test(layer.variable) || /^V1[5-8]$/.test(layer.variable)) throw new Error('Variable no permitida en la demostración pública.');
     if (!layer.approvalReference?.trim() || (session ? layer.sessionApproved !== true : layer.publicApproved !== true || layer.sessionOnly === true)) throw new Error('Falta revisión de publicación o de sesión.');
     if (layer.analysis) validateAnalysis(layer.analysis);
+    if (layer.scope !== undefined && !['city', 'municipality', 'metro_analysis', 'metro_official'].includes(layer.scope)) throw new Error('Ámbito territorial inválido.');
     if (!/^data\/[a-zA-Z0-9_/-]+\.geojson$/.test(layer.url) || layer.url.includes('..')) throw new Error('Ruta GeoJSON no permitida.');
     if (!layer.name?.trim() || !layer.legend?.trim() || !layer.style?.color || !Number.isFinite(layer.style.opacity) || layer.style.opacity < 0 || layer.style.opacity > 1) throw new Error('Faltan nombre, leyenda o estilo aprobado.');
     if (layer.style.categories !== undefined && layer.style.categoryField === undefined) throw new Error('Las categorías requieren un campo original explícito.');
+    if (layer.style.paint) { if (!layer.style.reference?.trim()) throw new Error('Falta referencia de simbología.'); validatePaint(layer.style.paint); }
     if (layer.style.categoryField !== undefined) {
       if (typeof layer.style.categoryField !== 'string' || !layer.style.categoryField.trim() || !layer.style.reference?.trim() || !Array.isArray(layer.style.categories) || !layer.style.categories.length) throw new Error('Falta referencia de simbología categórica.');
       const values = new Set();
@@ -30,7 +36,7 @@ export function validateCatalog(catalog, { session = false } = {}) {
 export class LayerManager {
   constructor(viewer, cesium) {
     this.viewer = viewer; this.cesium = cesium;
-    this.catalog = { version: 1, layers: [] }; this.loaded = new Map(); this.pending = new Map(); this.desired = new Map(); this.epoch = 0; this.sessionInputs = new Map(); this.originalRows = new Map(); this.opacities = new Map();
+    this.catalog = { version: 1, layers: [] }; this.loaded = new Map(); this.pending = new Map(); this.desired = new Map(); this.epoch = 0; this.sessionInputs = new Map(); this.originalRows = new Map(); this.opacities = new Map(); this.context = null;
   }
   setCatalog(catalog) {
     const validated = validateCatalog(catalog);
@@ -46,6 +52,10 @@ export class LayerManager {
     this.sessionInputs.set(id, geojson);
     this.catalog = { ...this.catalog, layers: [...this.catalog.layers, layer] };
     return layer;
+  }
+  setContext(plaza, scope) {
+    if (!Object.hasOwn(PLAZAS, plaza) || !['city', 'municipality', 'metro_analysis', 'metro_official'].includes(scope)) throw new Error('Contexto territorial inválido.');
+    this.clear(); this.context = { plaza, scope };
   }
   removeSessionLayers() {
     for (const layer of this.catalog.layers.filter(layer => layer.sessionOnly)) {
@@ -67,6 +77,7 @@ export class LayerManager {
   async setVisible(id, visible) {
     const layer = this.catalog.layers.find(item => item.id === id);
     if (!layer) throw new Error('Capa desconocida.');
+    if (this.context && (layer.plaza !== this.context.plaza || (layer.scope ?? 'city') !== this.context.scope)) throw new Error('La capa no corresponde a la plaza y ámbito activos. No se permite sustitución por ciudad.');
     this.desired.set(id, visible);
     if (this.loaded.has(id)) { this.loaded.get(id).show = visible; this.viewer.scene?.requestRender(); return; }
     if (!visible) return;
@@ -85,6 +96,7 @@ export class LayerManager {
     const input = local ? { type: 'FeatureCollection', features: local.features.map(feature => ({ ...feature, properties: { __arecOriginal: feature.properties } })) } : layer.url;
     const source = await C.GeoJsonDataSource.load(input, { describe: () => '', markerColor: C.Color.WHITE, stroke: color, fill: color.withAlpha(layer.style.opacity), clampToGround: true });
     if (epoch !== this.epoch || !this.catalog.layers.some(item => item.id === layer.id)) return;
+    if (layer.style.paint) applyPaint(source, layer, C, this.viewer.clock?.currentTime, this.opacities.get(layer.id) ?? layer.style.opacity);
     await this.viewer.dataSources.add(source);
     if (epoch !== this.epoch || !this.catalog.layers.some(item => item.id === layer.id)) { this.viewer.dataSources.remove(source, true); return; }
     source.show = this.desired.get(layer.id) === true;
@@ -99,6 +111,10 @@ export class LayerManager {
     this.opacities.set(id, opacity);
     const source = this.loaded.get(id);
     if (!source) return;
+    if (layer.style.paint) {
+      applyPaint(source, layer, this.cesium, this.viewer.clock?.currentTime, opacity);
+      this.viewer.scene?.requestRender(); return;
+    }
     for (const entity of source.entities.values) {
       const properties = entity.properties?.getValue(this.viewer.clock?.currentTime) ?? {};
       const original = layer.sessionOnly ? properties.__arecOriginal ?? {} : properties;

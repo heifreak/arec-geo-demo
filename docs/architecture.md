@@ -23,7 +23,7 @@ La interfaz tiene barra superior, panel izquierdo de escena/capas/dibujo y panel
 
 Pendientes: búsqueda de direcciones con proveedor autorizado, ámbitos central/metropolitano, grupos oficiales de variables, estilos categóricos V14, validación geodésica de precisión, mallas, ZCU, macropolígonos T1/T2/T3, motor multicriterio y Balance de Tierra REC. No hay cálculos territoriales implementados ni resultados simulados.
 
-Se necesitan `index_v15_metropolitano.html`, diccionario rector de las 23 variables/subcapas y reglas V14, y una muestra de una plaza revisada para publicación. El ZIP de 351.41 MB no está disponible y excluir V15–V18 no autoriza automáticamente el resto.
+El HTML original se recibió y se analizó únicamente en privado. Faltan la Especificación Técnica Rectora, la validación de reglas y una muestra de una plaza revisada para el uso autorizado. El ZIP de 351.41 MB no está disponible y excluir V15–V18 no autoriza automáticamente el resto.
 
 ## Entrada privada y muestras de sesión
 
@@ -40,3 +40,14 @@ Un descriptor de sesión requiere los metadatos de capa (plaza, variable, nombre
 El bloque opcional `analysis` requiere `reference`, `scope` (`sample`/`plaza`) y `cellIdField`, y admite `classField` y `metrics`. Cada métrica exige id, campo original, etiqueta, unidad, agregación `sum` o `mean` y referencia de esa regla. No existe un mapeo AREC predeterminado. El desarrollador creará el descriptor a partir de documentos/datos revisados, no el usuario manualmente.
 
 La comprobación 3D usa alturas devueltas por el proveedor remoto y evidencia de entidades de teselas visibles; muestra ausencia de evidencia cuando falta. Cambiar vista o proveedor invalida la comprobación. Sus recuentos no son un inventario de edificios únicos ni prueban cobertura completa.
+
+
+## Portabilidad de referencias sin distribuir sus definiciones
+
+- `reference-package.js`: valida un paquete JSON privado, con jerarquía y plantillas. No interpreta HTML/JavaScript, no sigue rutas y bloquea plantillas de variables internas. Leer el árbol no supone disponer de archivos geográficos.
+- `style-expressions.js`: intérprete restringido de expresiones declarativas; permite campos, coalesce, escalones, coincidencias y condiciones, sin eval ni ejecución de código. Operadores y propiedades no soportados fallan de forma explícita. Las definiciones concretas se suministran como datos privados, no como constantes de la aplicación pública.
+- `paint-renderer.js`: aplica esos símbolos a polígonos, líneas y círculos Cesium. Genera contornos clamped sobre terreno, incluidos huecos, vinculados al elemento original para inspección y sin sumarlos como registros analíticos. La intensidad multiplica las opacidades originales de cada tipo de geometría. No se certifica identidad píxel a píxel entre motores.
+- El contexto plaza/ámbito se valida en el administrador de capas. Cambiarlo invalida cargas y retira entidades; no sustituye datos metropolitanos por datos urbanos, no recorta polígonos ni calcula resultados. Los controles globales usan las 18 plazas existentes.
+- El inspector incluye referencia, leyenda, método, regla declarada, intensidad y accesos a capas activas. Todo texto se inserta sin ejecutar HTML recibido.
+
+El catálogo público sigue sin incluir datos originales. El análisis, inventario de definiciones y pruebas con valores de la referencia se conservan fuera del checkout. Los estilos discontinuos y formatos vectoriales adicionales permanecen pendientes; no se reemplazan con símbolos aproximados sin revisión.

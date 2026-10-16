@@ -1,3 +1,5 @@
+import { blockedVariable, validateReferencePackage, descriptorFromReference } from './reference-package.js';
+import { originalProperties } from './paint-renderer.js';
 import { layerSummaryRows } from './territorial-summary.js';
 import { PLAZAS } from './plazas.js';
 import { LayerManager } from './layers.js';
@@ -31,6 +33,9 @@ $('toggle-inspector').addEventListener('click', () => {
   $('toggle-inspector').setAttribute('aria-expanded', String(open));
 });
 const selector = $('plaza');
+let privateReference = null; let selectedLogicalId = null; let selectedLayerId = null;
+const scope = () => $('scope').value;
+const inContext = layer => layer.plaza === selector.value && (layer.scope ?? 'city') === scope();
 for (const [code, [name]] of Object.entries(PLAZAS)) {
   const option = document.createElement('option'); option.value = code; option.textContent = `${name} (${code})`; selector.append(option);
 }
@@ -43,10 +48,17 @@ function focusPlaza(code) {
   });
 }
 function changePlaza() {
-  layers.clear(); drawing.clear(); $('atributos').textContent = 'Selecciona una entidad de una capa cargada.';
-  focusPlaza(selector.value); renderLayers(); renderSummary();
+  layers.setContext(selector.value, scope()); drawing.clear(); $('atributos').textContent = 'Selecciona una entidad de una capa cargada.'; $('coincidentes').replaceChildren(); $('selected-layer').textContent = 'Ninguna'; $('layer-method').textContent = ''; $('layer-legend').replaceChildren();
+  selectedLayerId = null; $('selected-opacity').disabled = true;
+  focusPlaza(selector.value); renderLayers(); renderSummary(); renderReferenceTree();
+  if (privateReference && selectedLogicalId) {
+    const template = privateReference.templates.find(template => template.logicalId === selectedLogicalId);
+    if (template) selectLayerMetadata(template);
+    $('reference-status').textContent = `Contexto actualizado: ${selector.value} · ${scope()}. Se conserva la selección de referencia, sin cargar ni sustituir datos.`;
+  }
 }
 selector.addEventListener('change', changePlaza);
+$('scope').addEventListener('change', changePlaza);
 viewer.homeButton.viewModel.command.beforeExecute.addEventListener(event => {
   event.cancel = true; selector.value = 'JRZ'; changePlaza();
 });
@@ -78,6 +90,8 @@ $('ion-form').addEventListener('submit', event => {
 $('terrain').addEventListener('change', () => providers.setTerrain($('terrain').checked));
 $('buildings').addEventListener('change', () => providers.setBuildings($('buildings').checked));
 $('base-map').addEventListener('change', () => providers.setBaseMap($('base-map').checked));
+$('view-world').addEventListener('click', () => viewer.camera.flyTo({ destination: C.Rectangle.MAX_VALUE, duration: 2 }));
+$('view-plazas').addEventListener('click', () => viewer.camera.flyToBoundingSphere(C.BoundingSphere.fromPoints(Object.values(PLAZAS).map(([, lon, lat]) => C.Cartesian3.fromDegrees(lon, lat))), { offset: new C.HeadingPitchRange(0, C.Math.toRadians(-55), 0), duration: 2 }));
 $('verify-3d').addEventListener('click', async () => {
   const button = $('verify-3d'); button.disabled = true;
   const revision = sceneRevision;
@@ -95,9 +109,10 @@ $('draw-finish').addEventListener('click', drawing.finish);
 $('draw-clear').addEventListener('click', drawing.clear);
 
 function describeEntity(entity) {
+  entity = entity._arecParent ?? entity;
   const layer = layers.catalog.layers.find(layer => layers.loaded.get(layer.id)?.entities.contains(entity));
-  const stored = entity.properties?.getValue(viewer.clock.currentTime) ?? {};
-  const fields = layer?.sessionOnly ? stored.__arecOriginal ?? {} : stored;
+  const fields = originalProperties(entity, layer ?? {}, viewer.clock.currentTime);
+  if (layer) selectLayerMetadata(layer);
   $('atributos').textContent = JSON.stringify({ elemento: entity.name || entity.id, capa: layer?.name ?? 'Elemento sin capa catalogada', fuente: layer?.source ?? 'No documentada', metodologia: layer?.methodology ?? 'No documentada', fechaCorte: layer?.updatedAt ?? 'No documentada', atributos: fields }, null, 2);
 }
 viewer.selectedEntityChanged.addEventListener(entity => {
@@ -111,7 +126,7 @@ inspect.setInputAction(event => {
   const choices = $('coincidentes'); choices.replaceChildren();
   const seen = new Set();
   for (const hit of hits) {
-    const entity = hit.id;
+    const entity = hit.id?._arecParent ?? hit.id;
     if (entity?.properties && !seen.has(entity)) {
       seen.add(entity);
       const button = document.createElement('button'); button.textContent = entity.name || String(entity.id);
@@ -130,14 +145,15 @@ inspect.setInputAction(event => {
 
 function renderLayers() {
   const panel = $('capas'); panel.replaceChildren();
-  const available = layers.catalog.layers.filter(layer => layer.plaza === selector.value);
+  const available = layers.catalog.layers.filter(inContext);
   if (!available.length) { panel.textContent = 'Sin capas territoriales autorizadas. V01–V23 y sus subcapas requieren el catálogo rector y los archivos originales.'; return; }
   for (const layer of available) {
-    const group = document.createElement('fieldset');
+    const group = document.createElement('fieldset'); group.dataset.layerId = layer.id;
     const legend = document.createElement('legend'); legend.textContent = `${layer.variable} · ${layer.name}${layer.sessionOnly ? ' · SOLO SESIÓN' : ''}`;
     const toggle = document.createElement('input'); toggle.type = 'checkbox'; toggle.checked = layers.loaded.get(layer.id)?.show === true;
     const label = document.createElement('label'); label.append(toggle, document.createTextNode(' Mostrar capa'));
     const opacity = document.createElement('input'); opacity.type = 'range'; opacity.min = 0; opacity.max = 1; opacity.step = 0.05; opacity.value = layers.opacities.get(layer.id) ?? layer.style.opacity; opacity.setAttribute('aria-label', `Opacidad de ${layer.name}`);
+    const metadata = document.createElement('button'); metadata.textContent = 'Leyenda y metodología'; metadata.type = 'button'; metadata.addEventListener('click', () => selectLayerMetadata(layer));
     const status = document.createElement('p'); const symbols = document.createElement('p'); symbols.textContent = layer.legend;
     const frame = document.createElement('button'); frame.type = 'button'; frame.textContent = 'Encuadrar capa'; frame.disabled = !toggle.checked;
     frame.addEventListener('click', async () => {
@@ -150,10 +166,11 @@ function renderLayers() {
       toggle.disabled = true; status.textContent = 'Cargando…';
       try { await layers.setVisible(layer.id, toggle.checked); layers.setOpacity(layer.id, Number(opacity.value)); status.textContent = toggle.checked ? 'Capa visible' : 'Capa oculta'; }
       catch { toggle.checked = false; status.textContent = 'No se pudo cargar la capa. Revisa el archivo y la conexión.'; }
-      finally { toggle.disabled = false; frame.disabled = !toggle.checked; renderSummary(); }
+      finally { toggle.disabled = false; frame.disabled = !toggle.checked; renderSummary(); renderReferenceTree(); }
     });
-    opacity.addEventListener('input', () => layers.setOpacity(layer.id, Number(opacity.value)));
-    group.append(legend, label, opacity, symbols, frame, status);
+    opacity.addEventListener('input', () => { layers.setOpacity(layer.id, Number(opacity.value)); if (selectedLayerId === layer.id) $('selected-opacity').value = opacity.value; });
+    if (layer.style.paint) { opacity.setAttribute('aria-label', `Intensidad sobre simbología original de ${layer.name}`); }
+    group.append(legend, label, opacity, symbols, metadata, frame, status);
     for (const category of layer.style.categories ?? []) {
       const item = document.createElement('p'); const swatch = document.createElement('span'); swatch.className = 'legend-swatch'; swatch.style.backgroundColor = category.color;
       item.append(swatch, document.createTextNode(category.label)); group.append(item);
@@ -162,10 +179,10 @@ function renderLayers() {
   }
 }
 function summary() {
-  const entries = layers.catalog.layers.filter(layer => layer.plaza === selector.value);
+  const entries = layers.catalog.layers.filter(inContext);
   const rows = [
-    ['Plaza', PLAZAS[selector.value][0]], ['Capas públicas autorizadas en catálogo', entries.filter(layer => !layer.sessionOnly).length], ['Muestras privadas de sesión', entries.filter(layer => layer.sessionOnly).length],
-    ['Variables con capas disponibles (catálogo/sesión)', new Set(entries.map(layer => layer.variable)).size],
+    ['Plaza', PLAZAS[selector.value][0]], ['Ámbito declarado', $('scope').selectedOptions[0].textContent], ['Capas públicas autorizadas en catálogo', entries.filter(layer => !layer.sessionOnly).length], ['Muestras privadas de sesión', entries.filter(layer => layer.sessionOnly).length],
+    ['Variables con capas disponibles (catálogo/sesión)', new Set(entries.filter(layer => layer.kind !== 'base').map(layer => layer.variable)).size],
     ['Celdas analizadas (plaza completa)', 'No disponible'], ['Distribución ZCU', 'No disponible'],
     ['Superficies y expansión', 'No disponible'], ['Puntaje de oportunidad / REC', 'Pendiente de reglas y validación'],
     ['Última actualización territorial', 'No verificada'],
@@ -184,6 +201,12 @@ function renderSummary() {
     const term = document.createElement('dt'); term.textContent = key;
     const definition = document.createElement('dd'); definition.textContent = String(value); target.append(term, definition);
   }
+  const active = $('active-layers'); active.replaceChildren();
+  for (const layer of layers.catalog.layers.filter(layer => inContext(layer) && layers.loaded.get(layer.id)?.show)) {
+    const button = document.createElement('button'); button.type = 'button'; button.textContent = layer.name;
+    button.addEventListener('click', () => selectLayerMetadata(layer)); active.append(button);
+  }
+  if (selectedLayerId && !layers.loaded.has(selectedLayerId)) $('selected-opacity').disabled = true;
 }
 $('export-csv').addEventListener('click', () => {
   if (hasSessionData() && !window.confirm('El CSV puede contener resultados de la muestra privada. ¿Guardar una copia local bajo tu responsabilidad?')) return;
@@ -200,21 +223,22 @@ fetch('./data/catalog.json').then(response => {
   if (!response.ok) throw new Error('No se pudo leer el catálogo de capas.');
   return response.json();
 }).then(catalog => { layers.setCatalog(catalog); renderLayers(); renderSummary(); }).catch(() => { $('capas').textContent = 'Catálogo no disponible o inválido. El mapa sigue disponible.'; });
-selector.value = 'JRZ'; focusPlaza('JRZ'); renderSummary();
+selector.value = 'JRZ'; layers.setContext('JRZ', scope()); focusPlaza('JRZ'); renderSummary();
 
 function hasSessionData() { return layers.catalog.layers.some(layer => layer.sessionOnly && layers.loaded.has(layer.id)); }
 $('session-form').addEventListener('submit', async event => {
   event.preventDefault();
   const status = $('session-status');
   const geoFile = $('session-geojson').files[0]; const descriptorFile = $('session-descriptor').files[0];
-  if (!geoFile || !descriptorFile || !$('session-consent').checked) return;
-  if (geoFile.size > 25 * 1024 * 1024 || descriptorFile.size > 1024 * 1024) { status.textContent = 'Límite de muestra: 25 MiB; descriptor: 1 MiB.'; return; }
+  if (!geoFile || !$('session-consent').checked) return;
+  if (!descriptorFile && (!privateReference || !selectedLogicalId)) { status.textContent = 'Selecciona una subcapa del paquete privado o un descriptor revisado.'; return; }
+  if (geoFile.size > 25 * 1024 * 1024 || (descriptorFile?.size ?? 0) > 1024 * 1024) { status.textContent = 'Límite de muestra: 25 MiB; descriptor: 1 MiB.'; return; }
   try {
-    const descriptor = JSON.parse(await descriptorFile.text());
-    if (descriptor.plaza !== selector.value) throw Error('El descriptor debe corresponder a la plaza seleccionada.');
+    const descriptor = descriptorFile ? JSON.parse(await descriptorFile.text()) : descriptorFromReference(privateReference, selectedLogicalId, selector.value, scope());
+    if (descriptor.plaza !== selector.value || (descriptor.scope ?? 'city') !== scope()) throw Error('El descriptor debe corresponder a la plaza y ámbito seleccionados; no hay sustitución silenciosa por ciudad.');
     const data = JSON.parse(await geoFile.text());
     layers.addSessionLayer({ ...descriptor, sessionApproved: true, publicApproved: false }, data);
-    renderLayers(); renderSummary();
+    renderLayers(); renderSummary(); renderReferenceTree();
     status.textContent = 'Muestra preparada SOLO EN MEMORIA. Actívala en Capas territoriales. No se ha subido a GitHub ni a un servidor.';
     $('session-geojson').value = ''; $('session-descriptor').value = ''; $('session-consent').checked = false;
   } catch (error) { status.textContent = `Muestra no cargada: ${error.message}`; }
@@ -222,5 +246,78 @@ $('session-form').addEventListener('submit', async event => {
 $('session-clear').addEventListener('click', () => {
   layers.removeSessionLayers(); viewer.selectedEntity = undefined; $('coincidentes').replaceChildren();
   $('atributos').textContent = 'Selecciona una entidad de una capa cargada.';
-  renderLayers(); renderSummary(); $('session-status').textContent = 'Referencias a muestras retiradas de la sesión. No implica borrado seguro de memoria ni de copias descargadas.';
+  renderLayers(); renderSummary(); renderReferenceTree(); $('session-status').textContent = 'Referencias a muestras retiradas de la sesión. No implica borrado seguro de memoria ni de copias descargadas.';
 });
+
+function selectLayerMetadata(layer) {
+  const target = layers.catalog.layers.find(item => inContext(item) && (item.id === layer.id || layer.logicalId && item.logicalId === layer.logicalId));
+  selectedLayerId = target?.id ?? null; $('selected-opacity').disabled = !target || !layers.loaded.has(target.id);
+  $('selected-opacity').value = target ? layers.opacities.get(target.id) ?? target.style.opacity : 1;
+  $('selected-layer').textContent = layer.name;
+  $('layer-method').textContent = [layer.source ? `Fuente: ${layer.source}` : 'Fuente no documentada', layer.methodology ? `Método: ${layer.methodology}` : 'Método no documentado', layer.formula ? `Regla declarada: ${layer.formula}` : 'Sin regla adicional documentada', `Ámbito: ${scope()}`, ...(layer.warnings ?? [])].join('\n\n');
+  const legend = $('layer-legend'); legend.replaceChildren();
+  const entries = layer.legendEntries ?? layer.style?.categories?.map(item => [item.color, item.label]) ?? [];
+  for (const [color, text] of entries) {
+    const line = document.createElement('p'); const swatch = document.createElement('span'); swatch.className = 'legend-swatch'; swatch.style.backgroundColor = color;
+    line.append(swatch, document.createTextNode(text)); legend.append(line);
+  }
+  if (!entries.length) legend.textContent = layer.legend ?? 'Sin leyenda documentada.';
+}
+$('selected-opacity').addEventListener('input', () => {
+  if (!selectedLayerId) return;
+  const value = Number($('selected-opacity').value); layers.setOpacity(selectedLayerId, value);
+  for (const group of document.querySelectorAll('#capas fieldset')) if (group.dataset.layerId === selectedLayerId) group.querySelector('input[type=range]').value = value;
+});
+function renderReferenceTree() {
+  const root = $('reference-tree'); root.replaceChildren();
+  if (!privateReference) { root.textContent = 'Sin paquete privado de referencia cargado. Las definiciones originales no se incluyen en el sitio público.'; return; }
+  const query = normalize($('layer-search').value);
+  if (privateReference.baseLayers?.length) {
+    const section = document.createElement('details'); section.open = true; const title = document.createElement('summary'); title.textContent = 'Base territorial de referencia'; section.append(title);
+    for (const base of privateReference.baseLayers) {
+      if (!normalize(base.name).includes(query)) continue;
+      const button = document.createElement('button'); button.type = 'button'; button.className = 'reference-choice'; button.textContent = `${base.name} · geometrías pendientes`;
+      button.addEventListener('click', () => { selectedLogicalId = base.id; const template = privateReference.templates.find(template => template.logicalId === base.id); selectLayerMetadata(template ?? { ...base, methodology: base.methodology ?? 'Simbología pendiente de soporte; no se sustituyen sus reglas.' }); $('reference-status').textContent = `Seleccionada: ${base.name}. Ámbito ${scope()}. Sin descarga automática.`; }); section.append(button);
+    }
+    root.append(section);
+  }
+  for (const group of privateReference.groups) {
+    const section = document.createElement('details'); section.open = true;
+    const title = document.createElement('summary'); title.textContent = group.name; section.append(title);
+    for (const id of group.variables) {
+      const variable = privateReference.variables.find(variable => variable.id === id);
+      if (blockedVariable(id)) { const locked = document.createElement('p'); locked.textContent = `${id} · Interna no habilitada`; section.append(locked); continue; }
+      const matching = variable.sublayers.filter(layer => normalize(`${id} ${variable.name} ${layer.name}`).includes(query));
+      if (!matching.length) continue;
+      const container = document.createElement('details'); container.open = Boolean(query); container.dataset.variable = id;
+      const name = document.createElement('summary'); name.textContent = `${id} · ${variable.name}`; container.append(name);
+      for (const layer of matching) {
+        const button = document.createElement('button'); button.type = 'button'; button.className = 'reference-choice';
+        const available = layers.catalog.layers.some(entry => inContext(entry) && entry.logicalId === layer.id);
+        button.textContent = `${layer.name} · ${available ? 'muestra recibida' : 'documentada; datos no recibidos'}`;
+        button.addEventListener('click', () => {
+          selectedLogicalId = layer.id;
+          const template = privateReference.templates.find(template => template.logicalId === layer.id);
+          selectLayerMetadata(template ?? { name: layer.name, source: layer.source, methodology: 'Simbología o método pendiente de soporte/revisión; no se asignan sustitutos.' });
+          $('reference-status').textContent = `Seleccionada: ${layer.name}. Ámbito ${scope()}. No se ha descargado ninguna capa.`;
+        });
+        container.append(button);
+      }
+      section.append(container);
+    }
+    root.append(section);
+  }
+}
+$('reference-form').addEventListener('submit', async event => {
+  event.preventDefault(); const file = $('reference-file').files[0];
+  if (!file || !$('reference-consent').checked) return;
+  if (file.size > 2 * 1024 * 1024) { $('reference-status').textContent = 'Paquete de referencia limitado a 2 MiB.'; return; }
+  try {
+    privateReference = validateReferencePackage(JSON.parse(await file.text())); selectedLogicalId = null;
+    renderReferenceTree(); $('reference-status').textContent = 'Referencia privada cargada en memoria. El árbol documentado no acredita disponibilidad de datos ni resultados.';
+    $('reference-file').value = ''; $('reference-consent').checked = false;
+  } catch { $('reference-status').textContent = 'Paquete de referencia inválido. No se ejecuta código ni se siguen sus enlaces.'; }
+});
+$('reference-clear').addEventListener('click', () => { privateReference = null; selectedLogicalId = null; renderReferenceTree(); $('selected-layer').textContent = 'Ninguna'; $('layer-method').textContent = ''; $('layer-legend').replaceChildren(); $('reference-status').textContent = 'Referencia retirada de la memoria de sesión. No se eliminan muestras ya cargadas; usa Retirar muestras para ello.'; });
+$('layer-search').addEventListener('input', renderReferenceTree);
+renderReferenceTree();

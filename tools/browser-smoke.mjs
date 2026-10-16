@@ -108,6 +108,42 @@ try {
   await page.locator('#session-clear').click();
   assert.doesNotMatch(await page.locator('#capas').textContent(), /Synthetic private cell/);
   assert.doesNotMatch(await page.locator('#summary').textContent(), /Synthetic total/);
+  // Recovered-definition workflow is tested with synthetic metadata; no original values in Git.
+  await page.locator('details').filter({ has: page.locator('#reference-form') }).locator('summary').click();
+  const variables = Array.from({ length: 23 }, (_, i) => ({ id: `V${String(i + 1).padStart(2, '0')}`, name: `Synthetic variable ${i + 1}`, sublayers: [{ id: `synthetic-sub-${i + 1}`, name: `Synthetic sublayer ${i + 1}` }] }));
+  const reference = { version: 1, kind: 'private-reference', reference: 'synthetic-only', variables, groups: [{ id: 'synthetic', name: 'Synthetic group', variables: variables.map(v => v.id) }], templates: [{ ...descriptor, logicalId: 'synthetic-sub-1', name: 'Synthetic recovered layer', methodology: 'Synthetic method from metadata', legendEntries: [['#112233', 'Synthetic low'], ['#445566', 'Synthetic high']], style: { color: '#ffffff', opacity: 1, reference: 'synthetic-only', paint: { 'fill-color': ['step', ['get', 'test_value'], '#112233', 3, '#445566'], 'fill-opacity': 0.6, 'line-color': '#778899', 'line-width': 2, 'line-opacity': 0.8 } } }] };
+  await page.locator('#reference-file').setInputFiles({ name: 'synthetic-reference.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(reference)) });
+  await page.locator('#reference-consent').check(); await page.locator('#reference-form button[type=submit]').click();
+  await page.waitForFunction(() => document.getElementById('reference-status').textContent.includes('cargada en memoria'));
+  assert.doesNotMatch(await page.locator('#reference-tree').textContent(), /Synthetic variable 15/);
+  await page.locator('#reference-tree [data-variable="V01"] > summary').click();
+  await page.locator('#reference-tree .reference-choice').filter({ hasText: /^Synthetic sublayer 1 ·/ }).click();
+  assert.match(await page.locator('#layer-method').textContent(), /Synthetic method from metadata/);
+  await page.selectOption('#scope', 'metro_analysis');
+  assert.match(await page.locator('#capas').textContent(), /Sin capas/);
+  await page.locator('#session-geojson').setInputFiles({ name: 'synthetic-metro.geojson', mimeType: 'application/geo+json', buffer: Buffer.from(JSON.stringify(privateData)) });
+  await page.locator('#session-consent').check(); await page.locator('#session-form button[type=submit]').click();
+  await page.waitForFunction(() => document.getElementById('session-status').textContent.includes('SOLO EN MEMORIA'));
+  await page.locator('#capas fieldset').filter({ hasText: 'Synthetic recovered layer' }).locator('input[type=checkbox]').check();
+  await page.getByText('Capa visible', { exact: true }).waitFor();
+  await page.locator('#capas input[type=range]').fill('0.5');
+  assert.match(await page.locator('#summary').textContent(), /Synthetic total \(test-units; sum\)7/);
+  await page.selectOption('#scope', 'city');
+  assert.doesNotMatch(await page.locator('#capas').textContent(), /Synthetic recovered layer/);
+  assert.doesNotMatch(await page.locator('#summary').textContent(), /Synthetic total/);
+  await page.locator('#session-clear').click(); await page.locator('#reference-clear').click();
+  if (process.env.PRIVATE_REFERENCE_PATH) {
+    // Optional local metadata audit: no screenshots/logged content or original HTML execution.
+    await page.locator('#reference-file').setInputFiles({ name: 'private-reference.json', mimeType: 'application/json', buffer: await readFile(process.env.PRIVATE_REFERENCE_PATH) });
+    await page.locator('#reference-consent').check(); await page.locator('#reference-form button[type=submit]').click();
+    await page.waitForFunction(() => document.getElementById('reference-status').textContent.includes('cargada en memoria'));
+    assert.equal(await page.locator('#reference-tree [data-variable]').count(), 19);
+    await page.locator('#reference-tree [data-variable="V14"] > summary').click();
+    await page.locator('#reference-tree [data-variable="V14"] button').first().click();
+    assert.ok((await page.locator('#layer-method').textContent()).length > 20);
+    await page.locator('#reference-clear').click();
+  }
+  assert.equal(requests.some(request => !['GET', 'HEAD'].includes(request.method)), false);
   const artifacts = process.env.ARTIFACT_DIR || '/tmp/arec-browser-artifacts'; await mkdir(artifacts, { recursive: true });
   await page.screenshot({ path: resolve(artifacts, 'synthetic-test.png') });
   useFixture = false; await page.reload({ waitUntil: 'networkidle' });
@@ -115,7 +151,10 @@ try {
   await page.screenshot({ path: resolve(artifacts, 'desktop.png') });
   await page.setViewportSize({ width: 390, height: 844 });
   await page.locator('#toggle-inspector').click(); assert.equal(await page.locator('.right-panel').isVisible(), true);
+  const brandBox = await page.locator('.brand').boundingBox(); const contextBox = await page.locator('.context').boundingBox();
+  assert.ok(brandBox.y >= 0 && contextBox.y >= 0 && contextBox.y + contextBox.height <= 145, 'Cabecera móvil completa sin recortes ni solapamiento');
+  for (const id of ['plaza', 'buscar', 'scope']) { const box = await page.locator('#' + id).boundingBox(); assert.ok(box && box.width >= 90 && box.x >= 0 && box.x + box.width <= 390, 'Controles de cabecera utilizables en móvil'); }
   await page.screenshot({ path: resolve(artifacts, 'mobile-inspector.png') });
   assert.deepEqual(errors, []);
-  console.log('PASS Chromium: navegación, búsqueda, GeoJSON sintético bajo demanda, opacidad, respaldo sin token, dibujo/medición, CSV, inspector móvil, muestra privada en memoria y resumen de atributos sintéticos sin subida. No valida servicios ion autenticados ni datos AREC reales.');
+  console.log('PASS Chromium: navegación, búsqueda, GeoJSON sintético bajo demanda, opacidad, respaldo sin token, dibujo/medición, CSV, inspector móvil, muestra privada en memoria resumen de atributos sintéticos, referencia privada declarativa y ámbitos sin fallback ni subida. No valida servicios ion autenticados ni datos AREC reales.');
 } finally { await browser?.close(); await new Promise(done => server.close(done)); }

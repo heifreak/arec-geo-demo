@@ -23,3 +23,9 @@ No fusionar main ni publicar sin aprobación del propietario.
 Añade un almacén temporal fuera del checkout para adjuntos, carga privada en memoria del navegador con descriptor revisado, simbología categórica por valores originales, encuadre de capa y resúmenes de atributos con referencias, alcance y faltantes. Ningún original ni dato corporativo se incluye en Git. La comprobación de escena exige respuestas de alturas y geometría visible; conectar un servicio no basta. Se documenta la configuración mínima ion y la entrega privada de los cinco archivos, solicitando solo el HTML V15 como siguiente paso.
 
 Validación actual: 23 pruebas unitarias y prueba ampliada Chromium aprobadas. El piloto auténtico sigue bloqueado por archivos originales y muestra autorizada; los datos usados en pruebas son sintéticos. Mantener PR #1 en borrador, sin fusionar ni publicar. No se han reintentado los enlaces bloqueados ni cambiado metadatos de readiness del PR.
+
+## Ampliación: referencias privadas y renderizado declarativo
+
+Permite leer en sesión un paquete de definiciones revisado, consultar el árbol agrupado y aplicar plantillas sin que el usuario escriba descriptores. Añade un intérprete limitado de estilos, contornos sobre terreno, símbolos por geometría, ficha de leyenda/metodología, intensidad y capas activas. El selector separa contextos territoriales sin fallback implícito y conserva las 18 plazas. Los originales, las definiciones extraídas y el análisis detallado no forman parte del cambio público.
+
+33 pruebas unitarias aprobadas; prueba Chromium ampliada y comprobaciones privadas separadas. Continúan pendientes los datos auténticos autorizados, la aceptación de métodos, estilos adicionales y los servicios ion autenticados. Mantener el PR en borrador, sin fusionar ni publicar.

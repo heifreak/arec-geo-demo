@@ -64,3 +64,10 @@ test('desactivar una capa durante la carga respeta la intención más reciente',
   const source = { show: true, entities: { values: [] } }; resolve(source); await loading;
   assert.equal(source.show, false);
 });
+test('el contexto metropolitano no usa ni conserva una capa de ciudad como sustituto', async () => {
+  const source = { entities: { values: [] } };
+  const { manager, sources } = harness(async () => source);
+  manager.setContext('JRZ', 'city'); await manager.setVisible('test', true);
+  manager.setContext('JRZ', 'metro_analysis'); assert.equal(sources.length, 0);
+  await assert.rejects(manager.setVisible('test', true), /No se permite sustitución/);
+});
