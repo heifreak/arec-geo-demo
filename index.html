@@ -2,12 +2,91 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <title>AREC GEO DEMO</title>
+  <meta charset="UTF-8">
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1">
+  <title>AREC GEO | Visor 3D</title>
+
+  <script src="https://cesium.com/downloads/cesiumjs/releases/1.146/Build/Cesium/Cesium.js"></script>
+  <link rel="stylesheet"
+        href="https://cesium.com/downloads/cesiumjs/releases/1.146/Build/Cesium/Widgets/widgets.css">
+
+  <style>
+    html, body, #cesiumContainer {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      font-family: Arial, sans-serif;
+    }
+
+    .panel {
+      position: absolute;
+      top: 15px;
+      left: 15px;
+      z-index: 10;
+      background: rgba(12, 22, 35, 0.92);
+      color: white;
+      padding: 16px 20px;
+      border-radius: 10px;
+      max-width: 290px;
+      pointer-events: none;
+    }
+
+    .panel h1 {
+      font-size: 22px;
+      margin: 0 0 8px;
+    }
+
+    .panel p {
+      font-size: 13px;
+      line-height: 1.5;
+      margin: 0;
+    }
+  </style>
 </head>
+
 <body>
+  <div id="cesiumContainer"></div>
+
+  <div class="panel">
     <h1>AREC GEO</h1>
-    <p>Visor de inteligencia territorial</p>
-    <p>Preparando mapa interactivo...</p>
+    <p>Visor territorial 3D</p>
+    <p>Exploración geográfica interactiva</p>
+    <p>Arrastra para girar e inclinar la vista.</p>
+  </div>
+
+  <script>
+    const viewer = new Cesium.Viewer(
+      "cesiumContainer",
+      {
+        baseLayer: new Cesium.ImageryLayer(
+          new Cesium.OpenStreetMapImageryProvider({
+            url: "https://tile.openstreetmap.org/",
+            maximumLevel: 18
+          })
+        ),
+        terrainProvider:
+          new Cesium.EllipsoidTerrainProvider(),
+        baseLayerPicker: false,
+        geocoder: false,
+        animation: false,
+        timeline: false,
+        navigationHelpButton: true
+      }
+    );
+
+    viewer.camera.flyTo({
+      destination: Cesium.Cartesian3.fromDegrees(
+        -106.4245, 31.6904, 180000
+      ),
+      orientation: {
+        heading: 0,
+        pitch: Cesium.Math.toRadians(-55),
+        roll: 0
+      },
+      duration: 2
+    });
+  </script>
 </body>
 </html>
