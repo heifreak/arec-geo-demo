@@ -22,3 +22,7 @@
 
 ## Validación disponible
 `npm test` ejecuta pruebas de catálogo y ciclo de carga sin red. No sustituye pruebas visuales de Cesium. Prueba manual: iniciar `npm start`, abrir el servidor local, comprobar inicio, 18 plazas, búsqueda, Home y controles. Con un catálogo autorizado, comprobar carga, opacidad, leyendas, atributos y cambio rápido de plaza durante una carga.
+
+## Alcance entregado en la segunda fase
+
+Controles de escena y respaldo, dibujos, medición esférica aproximada, inspector de coincidencias, inventario de catálogo con exportación CSV/impresión y herramientas de inventario privado. Las pruebas de navegador usan un fixture sintético separado de la publicación. Consultar docs/validation.md para evidencia; la aceptación de terreno/edificios requiere una sesión ion real y la de inteligencia territorial requiere archivos originales autorizados.

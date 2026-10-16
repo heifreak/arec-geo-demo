@@ -56,3 +56,11 @@ test('permite reintento tras fallo de carga', async () => {
   await assert.rejects(manager.setVisible('test', true), /network/);
   await manager.setVisible('test', true); assert.equal(sources.length, 1);
 });
+test('desactivar una capa durante la carga respeta la intención más reciente', async () => {
+  let resolve;
+  const { manager } = harness(() => new Promise(done => { resolve = done; }));
+  const loading = manager.setVisible('test', true);
+  await manager.setVisible('test', false);
+  const source = { show: true }; resolve(source); await loading;
+  assert.equal(source.show, false);
+});

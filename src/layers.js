@@ -18,18 +18,20 @@ export function validateCatalog(catalog) {
 export class LayerManager {
   constructor(viewer, cesium) {
     this.viewer = viewer; this.cesium = cesium;
-    this.catalog = { version: 1, layers: [] }; this.loaded = new Map(); this.pending = new Map(); this.epoch = 0;
+    this.catalog = { version: 1, layers: [] }; this.loaded = new Map(); this.pending = new Map(); this.desired = new Map(); this.epoch = 0;
   }
   setCatalog(catalog) { this.catalog = validateCatalog(catalog); }
   clear() {
     this.epoch++;
     for (const source of this.loaded.values()) this.viewer.dataSources.remove(source, true);
-    this.loaded.clear(); this.pending.clear();
+    this.loaded.clear(); this.pending.clear(); this.desired.clear();
+    this.viewer.scene?.requestRender();
   }
   async setVisible(id, visible) {
     const layer = this.catalog.layers.find(item => item.id === id);
     if (!layer) throw new Error('Capa desconocida.');
-    if (this.loaded.has(id)) { this.loaded.get(id).show = visible; return; }
+    this.desired.set(id, visible);
+    if (this.loaded.has(id)) { this.loaded.get(id).show = visible; this.viewer.scene?.requestRender(); return; }
     if (!visible) return;
     if (this.pending.has(id)) return this.pending.get(id);
     const epoch = this.epoch;
@@ -45,7 +47,9 @@ export class LayerManager {
     if (epoch !== this.epoch) return;
     await this.viewer.dataSources.add(source);
     if (epoch !== this.epoch) { this.viewer.dataSources.remove(source, true); return; }
+    source.show = this.desired.get(layer.id) === true;
     this.loaded.set(layer.id, source);
+    this.viewer.scene?.requestRender();
   }
   setOpacity(id, opacity) {
     const layer = this.catalog.layers.find(item => item.id === id);
@@ -59,5 +63,6 @@ export class LayerManager {
       if (entity.billboard) entity.billboard.color = color;
       if (entity.point) entity.point.color = color;
     }
+    this.viewer.scene?.requestRender();
   }
 }

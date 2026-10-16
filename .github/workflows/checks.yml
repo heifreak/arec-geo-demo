@@ -8,5 +8,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
+      - run: npm ci
       - run: npm test
-      - run: node --check src/app.js && node --check src/layers.js
+      - run: node --check src/app.js && node --check src/layers.js && node --check src/providers.js && node --check src/measurements.js

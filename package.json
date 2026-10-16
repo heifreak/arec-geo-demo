@@ -2,5 +2,12 @@
   "name": "arec-geo-demo",
   "private": true,
   "type": "module",
-  "scripts": { "test": "node --test", "start": "python3 -m http.server 8000 --bind 127.0.0.1" }
+  "scripts": {
+    "test": "node --test",
+    "start": "python3 -m http.server 8000 --bind 127.0.0.1",
+    "test:browser": "node tools/browser-smoke.mjs"
+  },
+  "devDependencies": {
+    "playwright-core": "1.64.1"
+  }
 }

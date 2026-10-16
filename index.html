@@ -1,71 +1,61 @@
-
 <!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport"
-        content="width=device-width, initial-scale=1">
-
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>AREC GEO | Visor Territorial 3D</title>
-
-  <!-- CesiumJS -->
   <script src="https://cesium.com/downloads/cesiumjs/releases/1.146/Build/Cesium/Cesium.js"></script>
-
-  <link rel="stylesheet"
-        href="https://cesium.com/downloads/cesiumjs/releases/1.146/Build/Cesium/Widgets/widgets.css">
-
+  <link rel="stylesheet" href="https://cesium.com/downloads/cesiumjs/releases/1.146/Build/Cesium/Widgets/widgets.css">
   <link rel="stylesheet" href="./src/styles.css">
 </head>
-
 <body>
-
-  <!-- VISOR 3D -->
-  <div id="cesiumContainer"></div>
-
-  <!-- PANEL PRINCIPAL -->
-  <div class="panel">
-
-    <h1>AREC GEO</h1>
-
-    <p class="subtitulo">
-      Visor de inteligencia territorial 3D
-    </p>
-
-    <p>
-      18 plazas oficiales · Grupo RUBA
-    </p>
-
-    <label for="plaza">
-      Seleccionar plaza
-    </label>
-
-    <label for="buscar">Buscar plaza</label>
-    <input id="buscar" type="search" placeholder="Nombre o código" autocomplete="off">
-    <select id="plaza"></select>
-
-    <div class="estado" id="estado">
-      Preparando visor...
+  <div id="cesiumContainer" aria-label="Visor territorial Cesium 3D"></div>
+  <header class="topbar">
+    <div class="brand"><strong>AREC <span>GEO</span></strong><small>INTELIGENCIA TERRITORIAL · 3D</small></div>
+    <div class="plaza-controls">
+      <label for="plaza">Plaza oficial <select id="plaza" aria-label="Seleccionar plaza"></select></label>
+      <label for="buscar">Buscar plaza <input id="buscar" type="search" placeholder="Nombre o código" autocomplete="off"></label>
     </div>
-
-    <div class="separador"></div>
-
-    <p>
-      Navega, acerca, gira e inclina
-      el mapa para explorar el territorio.
-    </p>
-
-    <p class="nota">
-      Versión demostrativa 3D.
-      Capas territoriales en preparación.
-    </p>
-
-    <h2>Capas territoriales</h2>
-    <div id="capas" aria-live="polite">Leyendo catálogo…</div>
-    <h2>Atributos</h2>
-    <pre id="atributos">Selecciona una entidad de una capa cargada.</pre>
-  </div>
-
+    <div class="context"><span class="badge">DEMOSTRACIÓN PÚBLICA</span><p id="estado" role="status">Preparando visor…</p><small id="resultados-busqueda" aria-live="polite">18 plazas oficiales · Sin Delicias</small><button id="toggle-inspector" aria-expanded="false">Inspector / estatus</button></div>
+  </header>
+  <aside class="panel left-panel" aria-label="Fuentes y herramientas">
+    <p class="eyebrow">EXPLORACIÓN</p><h1>Territorio en perspectiva</h1>
+    <p class="muted">Navega, acerca, gira e inclina el mapa. Datos territoriales sujetos a revisión de publicación.</p>
+    <details open><summary>Escena 3D</summary>
+      <label class="check"><input id="base-map" type="checkbox" checked> Mapa base OpenStreetMap</label>
+      <p id="base-map-status" class="muted" role="status">Teselas sujetas a disponibilidad y política de OpenStreetMap.</p>
+      <label class="check"><input id="terrain" type="checkbox"> Relieve · World Terrain</label>
+      <p id="terrain-status" class="muted" role="status">Elipsoide activo. Relieve pendiente de token ion.</p>
+      <label class="check"><input id="buildings" type="checkbox"> Edificios · OSM Buildings</label>
+      <p id="buildings-status" class="muted" role="status">Edificios desactivados. Cobertura según proveedor.</p>
+      <details class="subdetails"><summary>Conectar Cesium ion</summary>
+        <p class="muted">Usa solo un token de visualización con permiso assets:read. Se conserva en memoria durante esta sesión; no se guarda ni se envía al repositorio.</p>
+        <form id="ion-form"><label for="ion-token">Token de visualización <input id="ion-token" type="password" autocomplete="off" spellcheck="false"></label><button type="submit">Aplicar a esta sesión</button></form>
+        <p id="ion-status" class="muted" role="status">Sin token configurado. No uses credenciales privadas.</p>
+      </details>
+    </details>
+    <details><summary>Ir a coordenadas</summary>
+      <form id="ir-coordenadas"><label for="longitud">Longitud WGS84<input id="longitud" type="number" min="-180" max="180" step="any" required></label><label for="latitud">Latitud WGS84<input id="latitud" type="number" min="-90" max="90" step="any" required></label><button type="submit">Enfocar ubicación</button></form>
+      <p class="muted">Búsqueda de direcciones pendiente de proveedor autorizado.</p>
+    </details>
+    <details open><summary>Capas territoriales</summary><div id="capas" aria-live="polite">Leyendo catálogo…</div></details>
+    <details open><summary>Dibujo y medición</summary>
+      <div class="button-grid"><button id="draw-point">Punto</button><button id="draw-line">Línea / distancia</button><button id="draw-polygon">Polígono / área</button><button id="draw-finish">Terminar</button><button id="draw-clear">Limpiar dibujos</button></div>
+      <p id="drawing-status" role="status">Dibujos locales; no se guardan ni se publican.</p>
+      <p class="muted">Mediciones esféricas aproximadas sobre polígonos simples. No son superficies catastrales ni mediciones sobre el relieve.</p>
+    </details>
+    <details><summary>Capacidades pendientes</summary><p class="muted">Ámbito metropolitano, variables y simbología V14/V15: requieren referencias y datos. T1/T2/T3, multicriterio y Balance de Tierra REC: pendientes de reglas y validación. No se ejecutan cálculos de oportunidad.</p></details>
+  </aside>
+  <aside class="panel right-panel" aria-label="Inspector territorial y estatus">
+    <p class="eyebrow">INTELIGENCIA TERRITORIAL</p><h2>Inspector</h2>
+    <p class="muted">Selecciona un elemento del mapa. Si coinciden varias capas, elige un elemento.</p>
+    <div id="coincidentes" class="button-grid"></div><pre id="atributos">Selecciona una entidad de una capa cargada.</pre>
+    <details open class="report"><summary>Estatus de la plaza</summary>
+      <p class="muted">Inventario del catálogo público. No representa un diagnóstico territorial completo.</p>
+      <dl id="summary"></dl>
+      <div class="button-grid"><button id="export-csv">Exportar estatus CSV</button><button id="print-report">Imprimir / guardar PDF</button></div>
+    </details>
+  </aside>
   <script type="module" src="./src/app.js"></script>
-
 </body>
 </html>
