@@ -222,10 +222,10 @@ let reportWasOpen = true;
 window.addEventListener('beforeprint', () => { const report = document.querySelector('.report'); reportWasOpen = report.open; report.open = true; });
 window.addEventListener('afterprint', () => { document.querySelector('.report').open = reportWasOpen; });
 $('print-report').addEventListener('click', () => { if (!hasSessionData() || window.confirm('El informe puede contener resultados de la muestra privada. ¿Continuar con la impresión local?')) window.print(); });
-fetch('./data/catalog.json').then(response => {
+(document.documentElement.dataset.localPreview === 'true' ? Promise.resolve({ version: 1, layers: [] }) : fetch('./data/catalog.json').then(response => {
   if (!response.ok) throw new Error('No se pudo leer el catálogo de capas.');
   return response.json();
-}).then(catalog => { layers.setCatalog(catalog); renderLayers(); renderSummary(); }).catch(() => { $('capas').textContent = 'Catálogo no disponible o inválido. El mapa sigue disponible.'; });
+})).then(catalog => { layers.setCatalog(catalog); renderLayers(); renderSummary(); }).catch(() => { $('capas').textContent = 'Catálogo no disponible o inválido. El mapa sigue disponible.'; });
 selector.value = 'JRZ'; layers.setContext('JRZ', scope()); focusPlaza('JRZ'); renderSummary();
 
 function hasSessionData() { return layers.catalog.layers.some(layer => layer.sessionOnly && layers.loaded.has(layer.id)); }

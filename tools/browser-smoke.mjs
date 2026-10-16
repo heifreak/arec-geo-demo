@@ -44,6 +44,7 @@ try {
     return route.fulfill({ json: { type: 'FeatureCollection', features: [{ type: 'Feature', properties: { name: 'Muestra sintética', cell_id: 'TEST-ONLY', literal: '<script>no ejecutar</script>' }, geometry: { type: 'Point', coordinates: [-106.4245, 31.6904] } }] } });
   });
   await page.goto(`http://127.0.0.1:${server.address().port}/`, { waitUntil: 'networkidle', timeout: 60000 });
+  if (!process.env.PREVIEW_ONLY) {
   assert.equal(await page.locator('#plaza option').count(), 18);
   assert.equal(layerRequests, 0, 'No precargar GeoJSON');
   await page.locator('#capas input[type=checkbox]').check();
@@ -196,5 +197,37 @@ try {
   for (const id of ['plaza', 'buscar', 'scope']) { const box = await page.locator('#' + id).boundingBox(); assert.ok(box && box.width >= 90 && box.x >= 0 && box.x + box.width <= 390, 'Controles de cabecera utilizables en móvil'); }
   await page.screenshot({ path: resolve(artifacts, 'mobile-inspector.png') });
   assert.deepEqual(errors, []);
-  console.log('PASS Chromium: navegación, búsqueda, GeoJSON sintético bajo demanda, opacidad, respaldo sin token, dibujo/medición, CSV, inspector móvil, muestra privada en memoria resumen de atributos sintéticos, referencia privada declarativa y ámbitos sin fallback ni subida. No certifica metodologías, cobertura territorial ni servicios ion autenticados.');
+  }
+  if (process.env.PREVIEW_ONLY && (!process.env.PRIVATE_HTML_PATH || !process.env.PRIVATE_SAMPLE_PATH || !process.env.PRIVATE_DESCRIPTOR_PATH)) throw Error('Preview-only requiere los tres archivos privados de prueba.');
+  if (process.env.PRIVATE_HTML_PATH && process.env.PRIVATE_SAMPLE_PATH) {
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    // Managed Chromium blocks file:// navigation. Serve the identical self-contained file for runtime validation.
+    await page.goto(`http://127.0.0.1:${server.address().port}/preview.html`, { waitUntil: 'networkidle', timeout: 60000 });
+    assert.equal(await page.locator('#scope').inputValue(),'metro_analysis');
+    assert.match(await page.locator('#capas').textContent(),/Sin capas/);
+    await page.locator('#local-reference').setInputFiles(process.env.PRIVATE_HTML_PATH);
+    await page.locator('#local-cells').setInputFiles(process.env.PRIVATE_SAMPLE_PATH);
+    await page.locator('#local-consent').check();
+    await page.locator('#local-pilot-form button[type=submit]').click();
+    await page.waitForFunction(()=>document.getElementById('session-status').textContent.includes('SOLO EN MEMORIA'));
+    const descriptorDownload = page.waitForEvent('download'); await page.locator('#local-download').click();
+    const saved = JSON.parse(await readFile(await (await descriptorDownload).path(),'utf8'));
+    const expected = JSON.parse(await readFile(process.env.PRIVATE_DESCRIPTOR_PATH,'utf8'));
+    assert.deepEqual(saved.style.paint,expected.style.paint); assert.deepEqual(saved.legendEntries,expected.legendEntries);
+    await page.locator('#capas input[type=checkbox]').check(); await page.getByText('Capa visible',{exact:true}).waitFor({timeout:120000});
+    const data = JSON.parse(await readFile(process.env.PRIVATE_SAMPLE_PATH,'utf8'));
+    assert.ok((await page.locator('#summary').textContent()).includes(String(data.features.length)));
+    const ring = data.features[0].geometry.coordinates[0].slice(0,-1);
+    await page.locator('details').filter({has:page.locator('#ir-coordenadas')}).evaluate(element=>{element.open=true;});
+    await page.fill('#longitud',String(ring.reduce((n,p)=>n+p[0],0)/ring.length)); await page.fill('#latitud',String(ring.reduce((n,p)=>n+p[1],0)/ring.length));
+    await page.locator('#ir-coordenadas button[type=submit]').click(); await page.waitForTimeout(3500); await page.mouse.click(720,480);
+    await page.waitForFunction(()=>document.getElementById('cell-inspection').querySelectorAll('dd').length>0);
+    assert.deepEqual(JSON.parse(await page.locator('#atributos').textContent()).atributos,data.features[0].properties);
+    await page.locator('#local-clear').click(); assert.equal(await page.locator('#local-download').isDisabled(),true);
+    await page.reload({waitUntil:'networkidle'}); assert.match(await page.locator('#capas').textContent(),/Sin capas/);
+    assert.equal(requests.some(r=>!['GET','HEAD'].includes(r.method)),false);
+    console.log('PASS HTML autónomo por HTTP (file:// bloqueado por política del entorno): referencia original leída sin ejecutar, descriptor descargado con pintura y leyenda exactas, capa real, celda e inspector originales, limpieza y recarga sin datos persistentes.');
+  }
+  assert.deepEqual(errors, []);
+  if (!process.env.PREVIEW_ONLY) console.log('PASS Chromium: navegación, búsqueda, GeoJSON sintético bajo demanda, opacidad, respaldo sin token, dibujo/medición, CSV, inspector móvil, muestra privada en memoria resumen de atributos sintéticos, referencia privada declarativa y ámbitos sin fallback ni subida. No certifica metodologías, cobertura territorial ni servicios ion autenticados.');
 } finally { await browser?.close(); await new Promise(done => server.close(done)); }

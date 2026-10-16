@@ -29,3 +29,5 @@ El árbol y las plantillas originales se leen opcionalmente desde un paquete **p
 Las [primitivas espaciales offline](processing/README.md) comprueban geometría y conservan atributos; sus pruebas sintéticas no certifican todavía el piloto territorial.
 
 El inspector puede organizar campos mediante un descriptor privado, conservando sus nombres y valores originales. Si el descriptor incluye una huella de entrada, se comprueba antes de aplicar su mapeo. Los conteos del resumen se limitan al archivo cargado; no acreditan cobertura completa.
+
+Para revisar tus archivos desde tu computadora sin rutas internas ni servidor, descarga el HTML nuevo del visor de la rama y sigue la [demostración privada local](docs/private-preview.md). El botón de descarga genera el descriptor en tu navegador a partir de tus archivos locales.
