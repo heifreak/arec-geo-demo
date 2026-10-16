@@ -17,3 +17,9 @@ El prototipo tenía un visor monolítico y no disponía de infraestructura para 
 Referencias V15/documentos rectores bloqueados por HTTP 403; no se dispone de archivos originales ni datos públicos autorizados. Terreno y edificios requieren cuenta/plan y token ion restringido, además de validación real. No se han implementado diagnósticos reales, agrupaciones originales, ZCU, mallas AREC, motor multicriterio, T1/T2/T3 ni Balance de Tierra REC.
 
 No fusionar main ni publicar sin aprobación del propietario.
+
+## Ampliación: recepción privada y preparación del piloto JRZ
+
+Añade un almacén temporal fuera del checkout para adjuntos, carga privada en memoria del navegador con descriptor revisado, simbología categórica por valores originales, encuadre de capa y resúmenes de atributos con referencias, alcance y faltantes. Ningún original ni dato corporativo se incluye en Git. La comprobación de escena exige respuestas de alturas y geometría visible; conectar un servicio no basta. Se documenta la configuración mínima ion y la entrega privada de los cinco archivos, solicitando solo el HTML V15 como siguiente paso.
+
+Validación actual: 23 pruebas unitarias y prueba ampliada Chromium aprobadas. El piloto auténtico sigue bloqueado por archivos originales y muestra autorizada; los datos usados en pruebas son sintéticos. Mantener PR #1 en borrador, sin fusionar ni publicar. No se han reintentado los enlaces bloqueados ni cambiado metadatos de readiness del PR.

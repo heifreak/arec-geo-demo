@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
   <title>AREC GEO | Visor Territorial 3D</title>
   <script src="https://cesium.com/downloads/cesiumjs/releases/1.146/Build/Cesium/Cesium.js"></script>
   <link rel="stylesheet" href="https://cesium.com/downloads/cesiumjs/releases/1.146/Build/Cesium/Widgets/widgets.css">
@@ -28,6 +29,8 @@
       <p id="terrain-status" class="muted" role="status">Elipsoide activo. Relieve pendiente de token ion.</p>
       <label class="check"><input id="buildings" type="checkbox"> Edificios · OSM Buildings</label>
       <p id="buildings-status" class="muted" role="status">Edificios desactivados. Cobertura según proveedor.</p>
+      <button id="verify-3d" type="button">Comprobar vista 3D actual</button>
+      <pre id="verify-3d-status" role="status">Sin comprobación de terreno ni edificios reales.</pre>
       <details class="subdetails"><summary>Conectar Cesium ion</summary>
         <p class="muted">Usa solo un token de visualización con permiso assets:read. Se conserva en memoria durante esta sesión; no se guarda ni se envía al repositorio.</p>
         <form id="ion-form"><label for="ion-token">Token de visualización <input id="ion-token" type="password" autocomplete="off" spellcheck="false"></label><button type="submit">Aplicar a esta sesión</button></form>
@@ -39,6 +42,17 @@
       <p class="muted">Búsqueda de direcciones pendiente de proveedor autorizado.</p>
     </details>
     <details open><summary>Capas territoriales</summary><div id="capas" aria-live="polite">Leyendo catálogo…</div></details>
+    <details><summary>Muestra privada · solo sesión</summary>
+      <p class="muted">Los archivos se leen en este navegador; no se suben al servidor. El descriptor lo preparará el desarrollador desde la referencia V15. No sustituye la autorización para publicar.</p>
+      <form id="session-form">
+        <label for="session-geojson">Muestra GeoJSON de la plaza seleccionada<input id="session-geojson" type="file" accept=".geojson,.json" required></label>
+        <label for="session-descriptor">Descriptor revisado de campos y simbología<input id="session-descriptor" type="file" accept=".json" required></label>
+        <label class="check"><input id="session-consent" type="checkbox" required> Autorizada para revisión en esta sesión privada</label>
+        <button type="submit">Preparar muestra en memoria</button>
+      </form>
+      <button id="session-clear" type="button">Retirar muestras de sesión</button>
+      <p id="session-status" class="muted" role="status">Sin muestras de sesión. No se usan almacenamiento local ni IndexedDB.</p>
+    </details>
     <details open><summary>Dibujo y medición</summary>
       <div class="button-grid"><button id="draw-point">Punto</button><button id="draw-line">Línea / distancia</button><button id="draw-polygon">Polígono / área</button><button id="draw-finish">Terminar</button><button id="draw-clear">Limpiar dibujos</button></div>
       <p id="drawing-status" role="status">Dibujos locales; no se guardan ni se publican.</p>
@@ -51,7 +65,7 @@
     <p class="muted">Selecciona un elemento del mapa. Si coinciden varias capas, elige un elemento.</p>
     <div id="coincidentes" class="button-grid"></div><pre id="atributos">Selecciona una entidad de una capa cargada.</pre>
     <details open class="report"><summary>Estatus de la plaza</summary>
-      <p class="muted">Inventario del catálogo público. No representa un diagnóstico territorial completo.</p>
+      <p class="muted">Inventario y resúmenes de atributos de capas cargadas, incluidas muestras privadas si las activas. No equivale a cobertura completa de la plaza.</p>
       <dl id="summary"></dl>
       <div class="button-grid"><button id="export-csv">Exportar estatus CSV</button><button id="print-report">Imprimir / guardar PDF</button></div>
     </details>

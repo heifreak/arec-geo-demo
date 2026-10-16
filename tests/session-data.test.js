@@ -1,0 +1,51 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { validateSessionGeoJSON } from '../src/session-data.js';
+import { LayerManager, validateCatalog } from '../src/layers.js';
+const descriptor = { id: 'test', plaza: 'JRZ', variable: 'V01', name: 'Synthetic session only', approvalReference: 'synthetic-test-approval', legend: 'Synthetic style, not V14', style: { color: '#ffffff', opacity: 1, categoryField: 'test_class', reference: 'synthetic-style-reference', categories: [{ value: 'X', label: 'Synthetic X', color: '#112233' }] } };
+const data = () => ({ type: 'FeatureCollection', features: [{ type: 'Feature', properties: { test_id: 'a', test_class: 'X', description: '<img src="https://example.invalid/do-not-request">', 'marker-symbol': 'do-not-request' }, geometry: { type: 'Point', coordinates: [0, 0] } }] });
+test('muestra de sesión conserva atributos sin activar simplestyle ni descripciones HTML', async () => {
+  let input; const entries = [];
+  const viewer = { clock: { currentTime: 0 }, scene: { requestRender() {} }, dataSources: { async add(source) { entries.push(source); }, remove(source) { entries.splice(entries.indexOf(source), 1); } } };
+  const cesium = { Color: { WHITE: {}, fromCssColorString(css) { return { alpha: 1, withAlpha(alpha) { return { css, alpha }; } }; } }, GeoJsonDataSource: { async load(json, options) {
+    input = json; assert.equal(options.describe({}), '');
+    return { entities: { values: [{ properties: { getValue: () => json.features[0].properties }, polygon: {} }] } };
+  } } };
+  const manager = new LayerManager(viewer, cesium);
+  assert.throws(() => manager.addSessionLayer(descriptor, data()), /revisión/);
+  const layer = manager.addSessionLayer({ ...descriptor, sessionApproved: true }, data());
+  assert.equal(layer.publicApproved, false); assert.equal(layer.sessionOnly, true);
+  assert.throws(() => validateCatalog({ version: 1, layers: [layer] }), /revisión/);
+  assert.equal(entries.length, 0, 'No precargar la muestra');
+  await manager.setVisible(layer.id, true);
+  assert.equal(input.features[0].properties.description, undefined);
+  assert.equal(input.features[0].properties.__arecOriginal['marker-symbol'], 'do-not-request');
+  assert.equal(entries[0].entities.values[0].polygon.material.css, '#112233');
+  manager.setOpacity(layer.id, 0.4);
+  assert.deepEqual(entries[0].entities.values[0].polygon.material, { css: '#112233', alpha: 0.4 });
+  assert.equal(manager.originalRows.get(layer.id)[0].test_id, 'a');
+  manager.removeSessionLayers(); assert.equal(entries.length, 0); assert.equal(manager.sessionInputs.size, 0); assert.equal(manager.catalog.layers.length, 0);
+});
+test('rechaza coordenadas proyectadas, CRS sin validar y variables internas en sesiones', () => {
+  const invalid = data(); invalid.features[0].geometry.coordinates = [500000, 3100000];
+  assert.throws(() => validateSessionGeoJSON(invalid), /Coordenadas/);
+  assert.throws(() => validateSessionGeoJSON({ ...data(), crs: { properties: { name: 'EPSG:32613' } } }), /Reproyectar/);
+  const manager = new LayerManager({}, {});
+  assert.throws(() => manager.addSessionLayer({ ...descriptor, variable: 'V15', sessionApproved: true }, data()), /Variable no permitida/);
+  assert.throws(() => manager.addSessionLayer({ ...descriptor, sessionApproved: true, style: { ...descriptor.style, categoryField: undefined } }, data()), /campo original/);
+});
+test('retirar muestras no apaga capas públicas y descarta una muestra aún en carga', async () => {
+  let resolvePrivate;
+  const entries = [];
+  const viewer = { scene: { requestRender() {} }, dataSources: { async add(source) { entries.push(source); }, remove(source) { const index = entries.indexOf(source); if (index >= 0) entries.splice(index, 1); } } };
+  const source = () => ({ show: true, entities: { values: [] } });
+  const C = { Color: { WHITE: {}, fromCssColorString: () => ({ withAlpha: () => ({}) }) }, GeoJsonDataSource: { load(input) { return typeof input === 'string' ? Promise.resolve(source()) : new Promise(resolve => { resolvePrivate = resolve; }); } } };
+  const manager = new LayerManager(viewer, C);
+  manager.setCatalog({ version: 1, layers: [{ ...descriptor, id: 'public-test', url: 'data/test.geojson', publicApproved: true }] });
+  await manager.setVisible('public-test', true);
+  const layer = manager.addSessionLayer({ ...descriptor, sessionApproved: true }, data());
+  const pending = manager.setVisible(layer.id, true);
+  manager.removeSessionLayers(); resolvePrivate(source()); await pending;
+  assert.equal(entries.length, 1); assert.equal(manager.loaded.get('public-test').show, true);
+  assert.equal(manager.catalog.layers.length, 1); assert.equal(manager.catalog.layers[0].id, 'public-test');
+});

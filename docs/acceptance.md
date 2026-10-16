@@ -26,3 +26,7 @@
 ## Alcance entregado en la segunda fase
 
 Controles de escena y respaldo, dibujos, medición esférica aproximada, inspector de coincidencias, inventario de catálogo con exportación CSV/impresión y herramientas de inventario privado. Las pruebas de navegador usan un fixture sintético separado de la publicación. Consultar docs/validation.md para evidencia; la aceptación de terreno/edificios requiere una sesión ion real y la de inteligencia territorial requiere archivos originales autorizados.
+
+## Puerta de aceptación del piloto auténtico JRZ
+
+Pendiente hasta recibir las referencias y una muestra autorizada. Debe validarse una capa auténtica sobre Cesium, poder encuadrarla, seleccionar una celda y contrastar sus atributos calculados con el archivo original. El resumen debe coincidir con recuentos y agregaciones independientes sobre esa misma muestra, declarar su alcance y conservar faltantes. Los colores/leyendas deben compararse con V15. Verificar aparte terreno y edificios reales mediante la prueba de docs/cesium-ion.md. Mantener el PR en borrador hasta la revisión del propietario. Ninguna prueba sintética satisface por sí sola esta puerta.

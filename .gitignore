@@ -2,3 +2,5 @@ node_modules/
 runtime-config.local.json
 *.local.json
 artifacts/
+/private-originals/
+index_v15_metropolitano.html

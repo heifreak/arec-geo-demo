@@ -24,3 +24,19 @@ La interfaz tiene barra superior, panel izquierdo de escena/capas/dibujo y panel
 Pendientes: búsqueda de direcciones con proveedor autorizado, ámbitos central/metropolitano, grupos oficiales de variables, estilos categóricos V14, validación geodésica de precisión, mallas, ZCU, macropolígonos T1/T2/T3, motor multicriterio y Balance de Tierra REC. No hay cálculos territoriales implementados ni resultados simulados.
 
 Se necesitan `index_v15_metropolitano.html`, diccionario rector de las 23 variables/subcapas y reglas V14, y una muestra de una plaza revisada para publicación. El ZIP de 351.41 MB no está disponible y excluir V15–V18 no autoriza automáticamente el resto.
+
+## Entrada privada y muestras de sesión
+
+`tools/private-intake.mjs` recibe adjuntos ya descargados por Codex y los conserva fuera del checkout, bajo `/tmp/arec-geo-private`, con recibos privados de integridad y aprobación pública falsa. Véase docs/private-intake.md; no existe un endpoint público de recepción. El HTML de referencia nunca se ejecuta como parte de esta entrada.
+
+El visor admite muestras GeoJSON y descriptores revisados mediante File API, exclusivamente en memoria. El catálogo de sesión está separado por `sessionOnly` y no supera el control del catálogo público, aunque alguien intente reutilizarlo. Las muestras no se solicitan por URL ni se suben al servidor; V15–V18 siguen excluidas. Se preservan atributos originales en una propiedad encapsulada de representación para evitar que descripciones HTML/simplestyle emitan solicitudes externas. El inspector los presenta sin transformaciones analíticas.
+
+`src/session-data.js` comprueba estructura, límites y rango de coordenadas WGS84. No valida topología exhaustiva, dimensiones métricas de malla ni que una geometría pertenezca realmente a JRZ; eso requiere revisar los archivos auténticos.
+
+`src/territorial-summary.js` resume atributos existentes solo con un mapeo explícito. Rechaza identificadores duplicados/ausentes, mantiene faltantes separados de cero, declara muestra/plaza y nunca combina capas para dar un total único de celdas sin una regla validada. Las capas ocultas pero cargadas siguen presentes en el resumen con ese estado explícito. No calcula ZCU, NDVI, calor ni oportunidad desde geometrías.
+
+Un descriptor de sesión requiere los metadatos de capa (plaza, variable, nombre, referencia de revisión y leyenda), `style.color` y `style.opacity`. Para color por clase requiere `style.categoryField`, `style.reference` y `style.categories` con valor original/color/etiqueta. Es una búsqueda por valor preexistente, sin umbrales inventados; iconos, patrones o reglas adicionales de V15 aún requieren la referencia. El formulario concede revisión de sesión, nunca publicación.
+
+El bloque opcional `analysis` requiere `reference`, `scope` (`sample`/`plaza`) y `cellIdField`, y admite `classField` y `metrics`. Cada métrica exige id, campo original, etiqueta, unidad, agregación `sum` o `mean` y referencia de esa regla. No existe un mapeo AREC predeterminado. El desarrollador creará el descriptor a partir de documentos/datos revisados, no el usuario manualmente.
+
+La comprobación 3D usa alturas devueltas por el proveedor remoto y evidencia de entidades de teselas visibles; muestra ausencia de evidencia cuando falta. Cambiar vista o proveedor invalida la comprobación. Sus recuentos no son un inventario de edificios únicos ni prueban cobertura completa.

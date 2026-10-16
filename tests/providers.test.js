@@ -4,7 +4,7 @@ import { ProviderController } from '../src/providers.js';
 
 function event() {
   const handlers = new Set();
-  return { addEventListener(handler) { handlers.add(handler); return () => handlers.delete(handler); }, raise() { for (const handler of [...handlers]) handler(); } };
+  return { addEventListener(handler) { handlers.add(handler); return () => handlers.delete(handler); }, raise(...args) { for (const handler of [...handlers]) handler(...args); } };
 }
 function harness(overrides = {}) {
   const notices = [];
@@ -59,4 +59,25 @@ test('descarta terreno tardío y destruye edificios tras desactivarlos durante c
 test('ocultar mapa base no altera terreno ni edificios', async () => {
   const h = harness(); h.controller.setToken('test-only'); await h.controller.setTerrain(true);
   h.controller.setBaseMap(false); assert.equal(h.imagery.show, false); assert.equal(h.viewer.terrainProvider, h.terrain);
+});
+test('diagnóstico sin token no confunde el elipsoide con relieve validado', async () => {
+  const h = harness(); h.controller.setToken('');
+  const result = await h.controller.inspect3D();
+  assert.match(result.terrain, /no validado/); assert.deepEqual(result.sampledHeightsMeters, []);
+  assert.match(result.buildings, /Sin geometría/);
+});
+test('diagnóstico exige evidencia visible y alturas; conectarse a ion no basta', async () => {
+  const h = harness(); h.viewer.scene.preRender = event(); h.tiles.tileVisible = event();
+  h.viewer.scene.canvas = { clientWidth: 100, clientHeight: 100 };
+  h.viewer.camera = { getPickRay: point => point };
+  h.viewer.scene.globe.pick = ray => ray;
+  h.C.Cartesian2 = class { constructor(x, y) { this.x = x; this.y = y; } };
+  h.C.Cartographic = { fromCartesian: point => point };
+  h.C.sampleTerrainMostDetailed = async (provider, points) => points.map(point => ({ ...point, height: 123 })); // Synthetic test elevations only.
+  h.controller.setToken('test-only'); await h.controller.setTerrain(true); await h.controller.setBuildings(true);
+  assert.match((await h.controller.inspect3D()).buildings, /sin entidades visibles/);
+  h.viewer.scene.preRender.raise(); h.tiles.tileVisible.raise({ content: { featuresLength: 2 } });
+  const evidence = await h.controller.inspect3D(); assert.match(evidence.buildings, /2 entidades/);
+  assert.deepEqual(evidence.sampledHeightsMeters, [123, 123, 123]);
+  h.viewer.scene.preRender.raise(); assert.match((await h.controller.inspect3D()).buildings, /sin entidades visibles/);
 });

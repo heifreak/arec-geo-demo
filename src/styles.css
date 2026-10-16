@@ -19,3 +19,4 @@ label { display:block; font-size:12px; }input,select,button { font:inherit; bord
 #toggle-inspector { display:none; }
 @media(max-width:760px) { #toggle-inspector { display:block; padding:3px 6px; margin-left:auto; }.inspector-open .right-panel { display:block; left:8px; right:8px; width:auto; }.inspector-open .left-panel { display:none; } }
 @media print { #toggle-inspector { display:none!important; } }
+.legend-swatch { display:inline-block; width:14px; height:14px; margin-right:7px; border:1px solid #fff9; vertical-align:middle; }

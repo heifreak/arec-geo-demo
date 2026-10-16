@@ -52,7 +52,7 @@ test('descarta resultados tardíos y evita cargas duplicadas', async () => {
 });
 test('permite reintento tras fallo de carga', async () => {
   let calls = 0;
-  const { manager, sources } = harness(async () => { if (++calls === 1) throw new Error('network'); return {}; });
+  const { manager, sources } = harness(async () => { if (++calls === 1) throw new Error('network'); return { entities: { values: [] } }; });
   await assert.rejects(manager.setVisible('test', true), /network/);
   await manager.setVisible('test', true); assert.equal(sources.length, 1);
 });
@@ -61,6 +61,6 @@ test('desactivar una capa durante la carga respeta la intención más reciente',
   const { manager } = harness(() => new Promise(done => { resolve = done; }));
   const loading = manager.setVisible('test', true);
   await manager.setVisible('test', false);
-  const source = { show: true }; resolve(source); await loading;
+  const source = { show: true, entities: { values: [] } }; resolve(source); await loading;
   assert.equal(source.show, false);
 });

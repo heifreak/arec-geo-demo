@@ -5,6 +5,8 @@ export class ProviderController {
     this.generations = { terrain: 0, buildings: 0 };
     this.removeTerrainError = null; this.removeBuildingError = null;
     this.buildings = null; this.token = '';
+    this.visibleBuildingTiles = 0; this.visibleBuildingFeatures = 0;
+    this.removeBuildingFrame = null; this.removeBuildingVisible = null;
   }
   setToken(token) {
     // No token persistence, logging, or embedded demo credential.
@@ -46,6 +48,9 @@ export class ProviderController {
     }
   }
   removeBuildings() {
+    this.removeBuildingFrame?.(); this.removeBuildingFrame = null;
+    this.removeBuildingVisible?.(); this.removeBuildingVisible = null;
+    this.visibleBuildingTiles = 0; this.visibleBuildingFeatures = 0;
     this.removeBuildingError?.(); this.removeBuildingError = null;
     if (this.buildings) this.viewer.scene.primitives.remove(this.buildings);
     this.buildings = null;
@@ -62,6 +67,14 @@ export class ProviderController {
       const tileset = await this.C.createOsmBuildingsAsync({ maximumScreenSpaceError: 24, cacheBytes: 128 * 1024 * 1024, maximumCacheOverflowBytes: 64 * 1024 * 1024, enableShowOutline: false });
       if (generation !== this.generations.buildings) { tileset.destroy(); return; }
       this.buildings = this.viewer.scene.primitives.add(tileset);
+      if (this.viewer.scene.preRender && tileset.tileVisible) {
+        this.removeBuildingFrame = this.viewer.scene.preRender.addEventListener(() => { this.visibleBuildingTiles = 0; this.visibleBuildingFeatures = 0; });
+        this.removeBuildingVisible = tileset.tileVisible.addEventListener(tile => {
+          this.visibleBuildingTiles++;
+          const count = tile.content?.featuresLength;
+          if (Number.isFinite(count)) this.visibleBuildingFeatures += count;
+        });
+      }
       this.removeBuildingError = tileset.tileFailed.addEventListener(() => {
         if (generation !== this.generations.buildings) return;
         ++this.generations.buildings; this.removeBuildings();
@@ -73,5 +86,30 @@ export class ProviderController {
     } catch {
       if (generation === this.generations.buildings) this.notify('buildings', { state: 'off', message: 'No se pudieron cargar edificios: revisa token, permisos del activo y red.' });
     }
+  }
+  async inspect3D() {
+    const C = this.C; const viewer = this.viewer;
+    const evidence = { terrain: 'Sin muestreo autenticado', buildings: 'Sin geometría visible comprobada', sampledHeightsMeters: [] };
+    const terrain = viewer.terrainProvider;
+    if (!(terrain instanceof C.EllipsoidTerrainProvider)) {
+      const { clientWidth: width, clientHeight: height } = viewer.scene.canvas;
+      const points = [];
+      for (const fraction of [0.45, 0.5, 0.55]) {
+        const ray = viewer.camera.getPickRay(new C.Cartesian2(width * fraction, height * 0.5));
+        const position = ray && viewer.scene.globe.pick(ray, viewer.scene);
+        if (position) points.push(C.Cartographic.fromCartesian(position));
+      }
+      try {
+        if (!points.length) throw Error('Vista sin intersección con el globo');
+        const samples = await C.sampleTerrainMostDetailed(terrain, points);
+        if (terrain !== viewer.terrainProvider) throw Error('El proveedor cambió durante el muestreo');
+        evidence.sampledHeightsMeters = samples.map(point => point.height).filter(Number.isFinite);
+        evidence.terrain = evidence.sampledHeightsMeters.length === points.length ? 'Respuesta de alturas recibida del proveedor activo; revisar contraste visual y precisión' : 'Respuesta de alturas incompleta';
+      } catch { evidence.terrain = 'No se pudo verificar el muestreo del terreno remoto'; }
+    } else evidence.terrain = 'Elipsoide de respaldo: relieve real no validado';
+    if (this.buildings && this.visibleBuildingTiles > 0 && this.visibleBuildingFeatures > 0) evidence.buildings = `Último fotograma: ${this.visibleBuildingTiles} teselas visibles con ${this.visibleBuildingFeatures} entidades reportadas por el proveedor. No equivale a cobertura completa ni a un inventario de edificios únicos.`;
+    else if (this.buildings) evidence.buildings = 'Proveedor conectado, sin entidades visibles comprobadas; acerca la cámara y revisa cobertura';
+    viewer.scene.requestRender();
+    return evidence;
   }
 }
