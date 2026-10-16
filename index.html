@@ -25,23 +25,49 @@
       top: 15px;
       left: 15px;
       z-index: 10;
-      background: rgba(12, 22, 35, 0.92);
+      background: rgba(12, 22, 35, 0.93);
       color: white;
-      padding: 16px 20px;
+      padding: 18px;
       border-radius: 10px;
-      max-width: 290px;
-      pointer-events: none;
+      width: 280px;
+      max-width: calc(100vw - 65px);
+      box-sizing: border-box;
     }
 
     .panel h1 {
-      font-size: 22px;
+      font-size: 23px;
       margin: 0 0 8px;
     }
 
     .panel p {
-      font-size: 13px;
+      font-size: 12px;
       line-height: 1.5;
-      margin: 0;
+      color: #d5dee8;
+    }
+
+    label {
+      display: block;
+      margin-top: 18px;
+      margin-bottom: 7px;
+      font-size: 13px;
+      font-weight: bold;
+    }
+
+    select {
+      width: 100%;
+      padding: 11px;
+      border-radius: 6px;
+      border: 1px solid #728396;
+      background: #ffffff;
+      color: #142131;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    .estado {
+      margin-top: 12px;
+      font-size: 12px;
+      color: #a9d5ff;
     }
   </style>
 </head>
@@ -51,9 +77,18 @@
 
   <div class="panel">
     <h1>AREC GEO</h1>
-    <p>Visor territorial 3D</p>
-    <p>Exploración geográfica interactiva</p>
-    <p>Arrastra para girar e inclinar la vista.</p>
+    <p>Visor de inteligencia territorial 3D</p>
+    <p>18 plazas oficiales · Grupo RUBA</p>
+
+    <label for="plaza">Seleccionar plaza</label>
+    <select id="plaza"></select>
+
+    <div class="estado" id="estado">
+      Preparando visor...
+    </div>
+
+    <p>Arrastra el mapa para girar,
+       inclinar o explorar el territorio.</p>
   </div>
 
   <script>
@@ -76,17 +111,67 @@
       }
     );
 
-    viewer.camera.flyTo({
-      destination: Cesium.Cartesian3.fromDegrees(
-        -106.4245, 31.6904, 180000
-      ),
-      orientation: {
-        heading: 0,
-        pitch: Cesium.Math.toRadians(-55),
-        roll: 0
-      },
-      duration: 2
+    // Centros geográficos del visor V15.
+    // Formato: nombre, longitud, latitud.
+    // Delicias se excluye: no es plaza oficial.
+    const plazas = {
+      JRZ: ["Ciudad Juárez", -106.4245, 31.6904],
+      CHH: ["Chihuahua", -106.0691, 28.6320],
+      SLT: ["Saltillo", -100.9950, 25.4232],
+      TOR: ["Torreón", -103.4068, 25.5428],
+      MTY: ["Monterrey", -100.3161, 25.6866],
+      HMO: ["Hermosillo", -110.9559, 29.0729],
+      OBR: ["Ciudad Obregón", -109.9408, 27.4864],
+      MXL: ["Mexicali", -115.4523, 32.6245],
+      TIJ: ["Tijuana", -117.0382, 32.5149],
+      GDL: ["Guadalajara", -103.3496, 20.6597],
+      QRO: ["Querétaro", -100.3899, 20.5888],
+      VER: ["Veracruz", -96.1342, 19.1738],
+      LEO: ["León", -101.6840, 21.1220],
+      PUE: ["Puebla", -98.2063, 19.0414],
+      TOL: ["Toluca", -99.6557, 19.2826],
+      CAN: ["Cancún", -86.8515, 21.1619],
+      SLP: ["San Luis Potosí", -100.9855, 22.1565],
+      AGS: ["Aguascalientes", -102.2916, 21.8853]
+    };
+
+    const selector = document.getElementById("plaza");
+    const estado = document.getElementById("estado");
+
+    for (const [codigo, datos] of Object.entries(plazas)) {
+      const opcion = document.createElement("option");
+      opcion.value = codigo;
+      opcion.textContent = `${datos[0]} (${codigo})`;
+      selector.appendChild(opcion);
+    }
+
+    function irAPlaza(codigo) {
+      const datos = plazas[codigo];
+      if (!datos) return;
+
+      estado.textContent = `Explorando: ${datos[0]}`;
+
+      viewer.camera.flyTo({
+        destination: Cesium.Cartesian3.fromDegrees(
+          datos[1],
+          datos[2],
+          110000
+        ),
+        orientation: {
+          heading: 0,
+          pitch: Cesium.Math.toRadians(-55),
+          roll: 0
+        },
+        duration: 2
+      });
+    }
+
+    selector.addEventListener("change", () => {
+      irAPlaza(selector.value);
     });
+
+    selector.value = "JRZ";
+    irAPlaza("JRZ");
   </script>
 </body>
 </html>
