@@ -2,7 +2,7 @@
 
 ## Única acción solicitada ahora
 
-El HTML de referencia ya se recibió y analizó como texto/AST en el entorno privado, sin ejecutarlo. El siguiente documento necesario es la **Especificación Técnica Rectora del 14 de octubre**. En tu computadora, expórtala desde Google Docs con Archivo → Descargar → PDF o DOCX y usa **Adjuntar archivos / +** en esta conversación. Envíala como archivo individual. El adjunto se entrega a la conversación de Codex, no a GitHub; se aplican las políticas de acceso y conservación de tu cuenta/organización. No se promete cifrado de extremo a extremo ni una retención distinta de la plataforma.
+El HTML de referencia ya se recibió y analizó como texto/AST en el entorno privado, sin ejecutarlo. La especificación rectora también se recibió y contrastó en privado. El siguiente archivo necesario es una **muestra GeoJSON autorizada de celdas V14 de Ciudad Juárez**, mediante **Adjuntar archivos / +** en esta conversación. El adjunto se entrega a la conversación de Codex, no a GitHub; se aplican las políticas de acceso y conservación de tu cuenta/organización. No se promete cifrado de extremo a extremo ni una retención distinta de la plataforma.
 
 No cambies permisos de Drive ni hagas públicos sus enlaces. No vuelvas a compartir el ZIP completo. No adjuntes credenciales o tokens. El mecanismo de descarga de esta sesión admite hasta 32 MiB por archivo; preferimos menos de 25 MiB.
 
@@ -18,7 +18,7 @@ Esta carpeta no está en `/workspace/arec-geo-demo` ni bajo el servidor `npm sta
 4. **Grabación del 8 de octubre**: MP4 o WebM original si es menor de 32 MiB. Si es mayor, exporta desde tu editor un clip menor de 25 MiB con el árbol de capas, la selección de una celda y su inspector. Podemos recibir varios clips sucesivos. No es necesario subirlo a un alojamiento público.
 5. **Muestra de Ciudad Juárez**: solo después de revisar autorización y campos. Adjuntar un GeoJSON individual, preferentemente de pocas celdas con atributos originales, más la fecha/fuente y el alcance de la autorización: “solo revisión privada” o “aprobada para demostración pública”. La primera no autoriza commits. Excluir V15–V18 y campos corporativos no autorizados. El nombre del visor V15 no significa que se autorice la variable interna V15.
 
-No se pide entregar los cinco archivos juntos. El HTML V15 ya se recibió; el siguiente archivo necesario es únicamente la Especificación Técnica Rectora del 14 de octubre.
+No se pide entregar los cinco archivos juntos. El HTML V15 y la especificación ya se recibieron; el siguiente archivo necesario es únicamente una muestra GeoJSON autorizada de celdas V14 de Ciudad Juárez.
 
 ## Vista previa de una muestra sin publicarla
 

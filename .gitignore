@@ -4,3 +4,7 @@ runtime-config.local.json
 artifacts/
 /private-originals/
 index_v15_metropolitano.html
+
+__pycache__/
+*.pyc
+.venv/
