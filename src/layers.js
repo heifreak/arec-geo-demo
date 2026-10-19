@@ -13,7 +13,7 @@ export function validateCatalog(catalog, { session = false } = {}) {
     ids.add(layer.id);
     if (!Object.hasOwn(PLAZAS, layer.plaza)) throw new Error('Plaza no autorizada.');
     if (layer.kind === 'base') {
-      if (!['grid', 'ageb', 'extent', 'municipalities'].includes(layer.role) || layer.variable !== 'BASE') throw new Error('Base territorial inválida.');
+      if (!['grid', 'ageb', 'extent', 'municipalities', 'localities', 'boundaries', 'reference'].includes(layer.role) || layer.variable !== 'BASE') throw new Error('Base territorial inválida.');
     } else if (!/^V(0[1-9]|1[0-9]|2[0-3])$/.test(layer.variable) || /^V1[5-8]$/.test(layer.variable)) throw new Error('Variable no permitida en la demostración pública.');
     if (!layer.approvalReference?.trim() || (session ? layer.sessionApproved !== true : layer.publicApproved !== true || layer.sessionOnly === true)) throw new Error('Falta revisión de publicación o de sesión.');
     if (layer.analysis) validateAnalysis(layer.analysis);

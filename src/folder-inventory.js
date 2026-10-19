@@ -9,10 +9,12 @@ export function classifyPath(path) {
   if(root<0||root===parts.length-1)return {status:'unrecognized'};
   const relative=parts.slice(root+1); const plaza=relative[0]?.toUpperCase();
   if(!Object.hasOwn(PLAZAS,plaza))return {status:'unknown-plaza'};
-  const scope=relative[1]==='evidence'?'city':relative[1]==='evidence_metro'?'metro_analysis':null;
+  let scope=relative[1]==='evidence'?'city':relative[1]==='evidence_metro'?'metro_analysis':null;
+  const base=['base','base_metro'].includes(relative[2]);
+  if(relative[2]==='base_metro')scope='metro_analysis';
   const variable=relative.find(p=>/^V(?:0[1-9]|1[0-9]|2[0-3])$/i.test(p))?.toUpperCase();
   const blocked=variable&&/^V1[5-8]$/.test(variable);
-  return {plaza,scope,variable,relative:relative.join('/'),status:blocked?'internal-excluded':!scope?'unrecognized-scope':!variable?'base-or-metadata':'recognized'};
+  return {plaza,scope,variable,base,storageScope:relative[1],relative:relative.join('/'),status:blocked?'internal-excluded':!scope?'unrecognized-scope':!variable?'base-or-metadata':'recognized'};
 }
 export async function inspectFile(file,{signal,onBytes=()=>{},collect=false,onFeature=()=>{}}={}) {
   if(file.size>MAX_SCAN_BYTES) return {kind:'size-limit',renderable:false,reason:'Supera el límite de inventario por archivo (128 MiB); campos no leídos.'};
@@ -64,8 +66,10 @@ export async function inspectFile(file,{signal,onBytes=()=>{},collect=false,onFe
   if(!featureArray)throw Error('FeatureCollection sin array features.');
   const validCRS=!crs||['EPSG:4326','urn:ogc:def:crs:OGC:1.3:CRS84','urn:ogc:def:crs:EPSG::4326'].includes(crs?.properties?.name);
   for(const stats of Object.values(fields))stats.missing=count-stats.present;
-  const renderable=!coordinateError&&validCRS&&!unsafeNumbers&&file.size<=MAX_RENDER_BYTES&&count<=50000&&count>0;
-  const summary={kind:'geojson',count,fields,geometries,crs:crs?.properties?.name??'WGS84 requerido por GeoJSON',rootName,renderable,reason:!validCRS?'CRS no compatible; no se reproyecta silenciosamente.':coordinateError?'Geometrías o coordenadas no compatibles.':unsafeNumbers?'Números no representables exactamente: revisión requerida.':file.size>MAX_RENDER_BYTES?'Representación limitada a 25 MiB; inventario disponible.':count>50000?'Representación limitada a 50 000 entidades; inventario disponible.':count===0?'Archivo vacío.':'Atributos disponibles; análisis no certificado.'};
+  const structurallyCompatible=!coordinateError&&validCRS&&!unsafeNumbers&&count>0;
+  const progressiveEligible=structurallyCompatible&&Object.keys(geometries).every(type=>type==='Point')&&(file.size>MAX_RENDER_BYTES||count>50000);
+  const renderable=structurallyCompatible&&file.size<=MAX_RENDER_BYTES&&count<=50000;
+  const summary={kind:'geojson',count,fields,geometries,crs:crs?.properties?.name??'WGS84 requerido por GeoJSON',rootName,structurallyCompatible,progressiveEligible,renderable,reason:!validCRS?'CRS no compatible; no se reproyecta silenciosamente.':coordinateError?'Geometrías o coordenadas no compatibles.':unsafeNumbers?'Números no representables exactamente: revisión requerida.':file.size>MAX_RENDER_BYTES?'Representación limitada a 25 MiB; inventario disponible.':count>50000?'Representación limitada a 50 000 entidades; inventario disponible.':count===0?'Archivo vacío.':'Atributos disponibles; análisis no certificado.'};
   if(collect){if(!renderable)throw Error(summary.reason);summary.data={type:'FeatureCollection',features,...(crs?{crs}:{})};}
   return summary;
 }

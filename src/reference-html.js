@@ -37,10 +37,11 @@ export async function sha256(text) {
 }
 function extractHTML(html) {
   if (html.length > 2*1024*1024) throw Error('Referencia demasiado grande.');
-  const layers = []; const metadata = []; const objects = []; const dynamicLayers = []; const declarations = []; const functions = new Map();
+  const trees=[]; const layers = []; const metadata = []; const objects = []; const dynamicLayers = []; const declarations = []; const functions = new Map();
   for (const match of html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)) {
     if (!match[1].trim()) continue;
     const tree = parse(match[1], { ecmaVersion: 'latest', sourceType: 'module' });
+    trees.push(tree);
     walk(tree, (node,owner) => {
       if (node.type === 'VariableDeclarator') declarations.push(node);
       if (node.type === 'FunctionDeclaration') functions.set(node.id?.name,node);
@@ -52,7 +53,7 @@ function extractHTML(html) {
       }
     });
   }
-  return { layers, metadata, objects, dynamicLayers, declarations, functions };
+  return { trees,layers, metadata, objects, dynamicLayers, declarations, functions };
 }
 
 function property(node,key) { return node.properties?.find(p => !p.computed && (p.key?.name ?? p.key?.value) === key)?.value; }
@@ -161,19 +162,45 @@ export async function descriptorFromHTML(html, geoText, { plaza, scope, variable
 }
 
 /** Compile private definitions at runtime; never store this result in public assets. */
+// Inert symbolic URL extraction: concatenation/templates and .toLowerCase only.
+// Never invokes reference functions, fetch, DOM, arbitrary calls or JavaScript evaluation.
+function documentedURLAliases(extracted){
+  const bindings=Object.create(null);const aliases=[];
+  function value(node,depth=0){
+    if(depth>12)throw Error('URL compleja');
+    if(node?.type==='Literal'&&typeof node.value==='string')return node.value;
+    if(node?.type==='Identifier'){
+      if(Object.hasOwn(bindings,node.name))return bindings[node.name];
+      if(/^(code|codigo)$/i.test(node.name))return '{CODE}';
+      throw Error('Identificador no resuelto');
+    }
+    if(node?.type==='TemplateLiteral')return node.quasis.map((q,i)=>q.value.cooked+(i<node.expressions.length?value(node.expressions[i],depth+1):'')).join('');
+    if(node?.type==='BinaryExpression'&&node.operator==='+')return value(node.left,depth+1)+value(node.right,depth+1);
+    if(node?.type==='CallExpression'&&node.arguments.length===0&&node.callee.type==='MemberExpression'&&!node.callee.computed&&node.callee.property.name==='toLowerCase')return value(node.callee.object,depth+1).replaceAll('{CODE}','{code}').toLowerCase();
+    throw Error('Expresión de URL no estática');
+  }
+  const declarations=extracted.declarations.filter(d=>d.id?.type==='Identifier');
+  for(let pass=0;pass<3;pass++)for(const d of declarations){try{const text=value(d.init);if(typeof text==='string'&&text.length<2048)bindings[d.id.name]=text;}catch{}}
+  for(const tree of extracted.trees)walk(tree,node=>{
+    if(node.type!=='ObjectExpression')return;
+    try{const source=literal(property(node,'source'));const path=value(property(node,'url'));if(typeof source==='string'&&/^\.\.\/data\/\{CODE\}\//.test(path)&&/\.geojson$/i.test(path))aliases.push({source,path});}catch{}
+  });
+  return aliases;
+}
 export async function compileReferenceHTML(html) {
   const extracted=extractHTML(html);
   const catalogs=extracted.objects.filter(o=>Array.isArray(o.variables)&&o.variables.length===23&&o.variables.every(v=>Number.isInteger(v.id)&&Array.isArray(v.subcapas)));
   const catalog=[...new Map(catalogs.map(c=>[JSON.stringify(c),c])).values()];
   if(catalog.length!==1)throw Error('No hay un catálogo único de 23 variables en la referencia.');
-  const reference=`Referencia local SHA256 ${await sha256(html)}`; const templates=[];
+  const reference=`Referencia local SHA256 ${await sha256(html)}`; const templates=[];const documentedAliases=documentedURLAliases(extracted);
   for(const variable of catalog[0].variables){
     const variableId='V'+String(variable.id).padStart(2,'0');if(/^V1[5-8]$/.test(variableId))continue;
     for(const sub of variable.subcapas){
       const paths=[...new Set(extracted.objects.flatMap(object=>{
         const value=object[sub.id];return(typeof value==='string'?[value]:Array.isArray(value)?value:[]).filter(item=>typeof item==='string'&&/\.geojson$/i.test(item));
       }))];
-      const template={logicalId:sub.id,variable:variableId,variableName:variable.nombre,name:sub.nombre,paths,reference};
+      const legacyPaths=[...paths];
+      const template={legacyPaths,logicalId:sub.id,variable:variableId,variableName:variable.nombre,name:sub.nombre,paths,reference};
       try {
         const metaValues=extracted.objects.flatMap(object=>object[sub.id]?.legend?[object[sub.id]]:[]);
         const meta=[...new Map(metaValues.map(m=>[JSON.stringify(m),m])).values()];
@@ -182,6 +209,7 @@ export async function compileReferenceHTML(html) {
         const unique=[...new Map(sets.map(ids=>[JSON.stringify(ids),ids])).values()];
         let paint;
         if(unique.length===1&&!meta.length)throw Error('Metadatos de estilo específico ausentes.');
+        if(unique.length===1){const sources=new Set(extracted.layers.filter(layer=>unique[0].includes(layer.id)).map(layer=>layer.source));for(const alias of documentedAliases)if(sources.has(alias.source)&&!paths.includes(alias.path))paths.push(alias.path);}
         if(unique.length===1)paint=Object.assign({},...extracted.layers.filter(layer=>unique[0].includes(layer.id)).map(layer=>layer.paint));
         else if(unique.length>1)throw Error('Identificadores de pintura ambiguos.');
         else { const recovered=uniformStyle(extracted,sub.id,{source:sub.fuente??variable.fuente_base,method:JSON.stringify({geometria:sub.geometria,funcion_espacial:sub.funcion_espacial,efecto:sub.efecto})},true);paint=recovered.paint;if(!meta.length)meta.push(recovered.meta); }
@@ -191,7 +219,7 @@ export async function compileReferenceHTML(html) {
       templates.push(template);
     }
   }
-  return {reference,templates};
+  return {reference,templates,structure:catalog[0].variables.map(v=>{const id='V'+String(v.id).padStart(2,'0');return /^V1[5-8]$/.test(id)?{id,excluded:true}:{id,name:v.nombre,excluded:false};})};
 }
 export function matchReferencePath(path,route,bundle) {
   if(!['recognized','base-or-metadata'].includes(route.status)||!route.scope||!bundle)return [];
@@ -205,7 +233,7 @@ export function descriptorForInventory(template,data,route) {
   const expression=template.paint['fill-color'];
   const classField=Array.isArray(expression)&&expression[0]==='match'&&expression[1]?.[0]==='get'?expression[1][1]:undefined;
   const temporalEvidence=[...new Set(data.features.flatMap(f=>Object.values(f.properties).filter(v=>typeof v==='string'&&/GHSL/i.test(v))))].slice(0,100);
-  const descriptor={plaza:route.plaza,scope:route.scope,variable:template.variable,logicalId:template.logicalId,name:template.name,source:template.meta.source??'Referencia local',methodology:template.meta.method??'Método pendiente de documentación',formula:template.meta.formula??'Sin regla adicional',legendEntries:template.meta.legend,legend:template.meta.legend.map(pair=>pair[1]).join(' · '),approvalReference:template.reference,style:{color:template.meta.legend[0][0],opacity:1,paint:template.paint,reference:template.reference},inspection:{reference:template.reference,groups:[{label:'Atributos originales del archivo',fields:fields.map(field=>({field,label:field,note:'Valor precalculado; unidades y método no se infieren del nombre.'}))}]},temporalEvidence,bulkLocal:true,warnings:[...(template.visualWarning?[template.visualWarning]:[]),'Archivo privado seleccionado por el usuario; no autorizado para publicación.','Disponibilidad de atributos no certifica su cálculo ni cobertura. Se conserva la simbología implementada en la referencia, sin nuevas clases.']};
+  const descriptor={...(template.kind==='base'?{kind:'base',role:template.role}:{}),plaza:route.plaza,scope:route.scope,variable:template.variable,logicalId:template.logicalId,name:template.name,source:template.meta.source??'Referencia local',methodology:template.meta.method??'Método pendiente de documentación',formula:template.meta.formula??'Sin regla adicional',legendEntries:template.meta.legend,legend:template.meta.legend.map(pair=>pair[1]).join(' · '),approvalReference:template.reference,style:{color:template.meta.legend[0][0],opacity:1,paint:template.paint,reference:template.reference},inspection:{reference:template.reference,groups:Array.from({length:Math.max(1,Math.ceil(fields.length/100))},(_,i)=>({label:'Atributos originales del archivo · '+(i+1),fields:fields.slice(i*100,(i+1)*100).map(field=>({field,label:field,note:'Valor precalculado; unidades y método no se infieren del nombre.'}))}))},temporalEvidence,bulkLocal:true,warnings:[...(template.visualWarning?[template.visualWarning]:[]),'Archivo privado seleccionado por el usuario; no autorizado para publicación.','Disponibilidad de atributos no certifica su cálculo ni cobertura. Se conserva la simbología implementada en la referencia, sin nuevas clases.']};
   if(ids.length===1&&data.features.every(f=>['Polygon','MultiPolygon'].includes(f.geometry?.type)))descriptor.analysis={cellIdField:ids[0],classField,metrics:[],scope:'sample',reference:`Atributos originales · ${template.reference}; sin recalcular`};
   return descriptor;
 }

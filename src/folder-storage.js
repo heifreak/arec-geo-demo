@@ -5,7 +5,7 @@ function done(tx){return new Promise((resolve,reject)=>{tx.oncomplete=resolve;tx
 async function put(db,key,value){const tx=db.transaction('records','readwrite');const finished=done(tx);tx.objectStore('records').put(value,key);await finished;}
 async function removePrefix(db,prefix){const tx=db.transaction('records','readwrite');const finished=done(tx);const store=tx.objectStore('records');const req=store.openKeyCursor(IDBKeyRange.bound(prefix,prefix+'\uffff'));req.onsuccess=()=>{const cursor=req.result;if(cursor){store.delete(cursor.key);cursor.continue();}};await finished;}
 export async function saveFolderSnapshot(entries,reference,{inventoryState={complete:false,totalFiles:entries.length},signal,onProgress=()=>{},estimate=()=>navigator.storage?.estimate?.()??Promise.resolve({})}={}){
-  const eligible=entries.filter(e=>e.status==='recognized'&&e.renderable&&e.file);
+  const eligible=entries.filter(e=>e.persistEligible!==false&&e.status==='recognized'&&(e.renderable||e.progressiveEligible)&&e.file);
   const eligibleSet=new Set(eligible);
   const bytes=eligible.reduce((sum,e)=>sum+e.size,0);const quota=await estimate();
   if(Number.isFinite(quota.quota)&&Number.isFinite(quota.usage)&&bytes>quota.quota-quota.usage)throw Error('Espacio local insuficiente; no se reemplaza la copia anterior.');

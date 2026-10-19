@@ -39,7 +39,9 @@ export function applyPaint(source, layer, C, time, multiplier) {
       entity.polyline.material = color('line-color', 'line-opacity'); entity.polyline.width = p['line-width'] ?? 1;
     }
     if ((entity.billboard || entity.point) && colors['circle-color']) {
-      if (entity.billboard) entity.billboard.show = false;
+      // Clamped PointGraphics also use billboard primitives internally. Keeping a hidden
+      // BillboardGraphics on the same entity lets two visualizers compete for that primitive.
+      if (entity.billboard) entity.billboard = undefined;
       entity.point ??= new C.PointGraphics({ heightReference: C.HeightReference.CLAMP_TO_GROUND });
       entity.point.color = color('circle-color', 'circle-opacity'); entity.point.pixelSize = 2 * (p['circle-radius'] ?? 4);
       if (colors['circle-stroke-color']) entity.point.outlineColor = color('circle-stroke-color', 'circle-opacity');

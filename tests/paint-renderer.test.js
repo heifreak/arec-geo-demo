@@ -23,7 +23,7 @@ test('los puntos usan círculos con radio y borde documentados, sin conservar un
   const source = { entities: { values: [entity] } };
   const C = { HeightReference: { CLAMP_TO_GROUND: 'ground' }, PointGraphics: class { constructor(options) { Object.assign(this, options); } }, Color: { fromCssColorString: css => ({ alpha: 1, withAlpha: alpha => ({ css, alpha }) }) } };
   applyPaint(source, { style: { paint: { 'circle-color': '#112233', 'circle-radius': 3, 'circle-opacity': 0.8, 'circle-stroke-color': '#445566', 'circle-stroke-width': 1 } } }, C, 0, 0.5);
-  assert.equal(entity.billboard.show, false); assert.equal(entity.point.pixelSize, 6); assert.equal(entity.point.color.alpha, 0.4); assert.equal(entity.point.outlineColor.css, '#445566'); assert.equal(entity.point.heightReference, 'ground');
+  assert.equal(entity.billboard, undefined); assert.equal(entity.point.pixelSize, 6); assert.equal(entity.point.color.alpha, 0.4); assert.equal(entity.point.outlineColor.css, '#445566'); assert.equal(entity.point.heightReference, 'ground');
 });
 test('rechaza geometrías sin símbolo correspondiente antes de mostrar una representación inventada', () => {
   const entity = { billboard: { show: true } };

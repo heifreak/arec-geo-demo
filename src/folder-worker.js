@@ -1,14 +1,27 @@
+import {readPointWindow} from './point-window.js';
 import {resolvePaint} from './style-expressions.js';
 import { classifyPath, inspectFile } from './folder-inventory.js';
 self.onmessage=async({data})=>{
+  if(data.mode==='fingerprints'){
+    let completed=0;for(const item of data.files){
+      let fingerprint;
+      try{if(classifyPath(item.path).status==='internal-excluded'||item.file.size>25*1024*1024)throw Error('No se lee: interno o superior a 25 MiB para contraste binario.');const digest=await crypto.subtle.digest('SHA-256',await item.file.arrayBuffer());fingerprint={status:'checked',sha256:Array.from(new Uint8Array(digest),b=>b.toString(16).padStart(2,'0')).join(''),bytes:item.file.size};}
+      catch(error){fingerprint={status:'not-checked',reason:error.message};}
+      self.postMessage({kind:'fingerprint',path:item.path,fingerprint,completed:++completed,total:data.files.length});
+    }self.postMessage({kind:'done',completed});return;
+  }
+  if(data.mode==='window'){
+    try{if(classifyPath(data.path).status==='internal-excluded')throw Error('Variable interna excluida.');const result=await readPointWindow(data.file,data.bounds,{onBytes:bytes=>self.postMessage({kind:'bytes',bytes})});self.postMessage({kind:'result',result});}
+    catch(error){self.postMessage({kind:'failure',message:error.message});}return;
+  }
   if(data.mode==='validate-styles'){
     let completed=0;
     for(const item of data.files){
       let checked=0,failed=0,reason=null;
       try{
         if(classifyPath(item.path).status==='internal-excluded')throw Error('Variable interna excluida; contenido no leído.');
-        const result=await inspectFile(item.file,{onFeature:feature=>{checked++;try{resolvePaint(item.paint,feature.properties??{});}catch(error){failed++;reason??=error.message;}}});
-        if(result.kind!=='geojson'||!result.renderable)throw Error(result.reason??'Archivo geográfico no compatible.');
+        const result=await inspectFile(item.file,{onBytes:bytes=>self.postMessage({kind:'style-bytes',path:item.path,bytes,size:item.file.size,completed,total:data.files.length}),onFeature:feature=>{checked++;try{resolvePaint(item.paint,feature.properties??{});}catch(error){failed++;reason??=error.message;}}});
+        if(result.kind!=='geojson'||!result.renderable&&!result.progressiveEligible)throw Error(result.reason??'Archivo geográfico no compatible.');
       }catch(error){failed++;reason=error.message;}
       completed++;self.postMessage({kind:'style-validation',path:item.path,validation:{status:failed?'failed':'passed',checked,failed,reason},completed,total:data.files.length});
     }

@@ -56,3 +56,14 @@ test('compila catálogo privado sin incluir variables internas y vincula nombres
  assert.equal(matchReferencePath('data/JRZ/evidence/V02/actual_name_jrz.geojson',classifyPath('data/JRZ/evidence/V02/actual_name_jrz.geojson'),compiled).length,0);
  const descriptor=descriptorForInventory(matches[0],data,{plaza:'JRZ',scope:'metro_analysis'});assert.equal(descriptor.bulkLocal,true);assert.equal(descriptor.analysis,undefined,'Un ID genérico no certifica que sea una malla de celdas');
 });
+test('recovers only documented dynamic URL aliases through exact original source IDs',async()=>{
+ const {compileReferenceHTML,matchReferencePath}=await import('../src/reference-html.js');const {classifyPath}=await import('../src/folder-inventory.js');
+ const variables=Array.from({length:23},(_,i)=>({id:i+1,nombre:'Synthetic',subcapas:i===13?[{id:'synthetic_water',nombre:'Synthetic water'}]:[]}));
+ const text=html+`<script>const catalog=${JSON.stringify({variables})};const methods={synthetic_water:${JSON.stringify(meta)}};const ids={synthetic_water:['synthetic-layer','synthetic-line']};const routes={synthetic_water:'../data/{CODE}/evidence/V14/old_{code}.geojson'};const codigoMinuscula=codigo.toLowerCase();const base=\`../data/\${codigo}\`;const sources={extra:{source:'synthetic-source',url:base+'/evidence/V14/'+'water_'+codigoMinuscula+'_v02.geojson'}};globalThis.__aliasExecuted=true;</script>`;
+ const compiled=await compileReferenceHTML(text);assert.equal(compiled.templates[0].paths.length,2);assert.equal(compiled.templates[0].legacyPaths.length,1);const path='data/MTY/evidence_metro/V14/water_mty_v02.geojson';assert.equal(matchReferencePath(path,classifyPath(path),compiled).length,1);assert.equal(globalThis.__aliasExecuted,undefined);
+});
+test('inventory descriptors retain more than 100 original fields in bounded inspector groups',async()=>{
+ const {descriptorForInventory}=await import('../src/reference-html.js');const {validateInspection}=await import('../src/cell-inspector.js');
+ const properties=Object.fromEntries(Array.from({length:230},(_,i)=>['synthetic_'+i,i===0?null:i]));const original={type:'FeatureCollection',features:[{...data.features[0],properties}]};const descriptor=descriptorForInventory({variable:'V01',logicalId:'synthetic',name:'Synthetic',reference:'synthetic',paint:{'fill-color':'#123456'},meta},{...original},{plaza:'JRZ',scope:'city'});
+ assert.equal(descriptor.inspection.groups.length,3);assert.equal(descriptor.inspection.groups.flatMap(g=>g.fields).length,230);validateInspection(descriptor.inspection);assert.equal(original.features[0].properties.synthetic_0,null);
+});

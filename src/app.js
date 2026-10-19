@@ -337,7 +337,11 @@ $('reference-clear').addEventListener('click', () => { privateReference = null; 
 $('layer-search').addEventListener('input', renderReferenceTree);
 renderReferenceTree();
 
+viewer.camera.moveEnd.addEventListener(()=>window.dispatchEvent(new Event('arec-view-changed')));
 export const folderAPI={
+  viewBounds(){const r=viewer.camera.computeViewRectangle(viewer.scene.globe.ellipsoid);if(!r)throw Error('Apunta la cámara hacia el terreno para cargar una ventana.');return [r.west,r.south,r.east,r.north].map(C.Math.toDegrees);},
+  opacity:id=>layers.opacities.get(id)??1,
+  setOpacity(id,value){layers.setOpacity(id,value);renderLayers();},
   setInventoryRows(rows){folderInventoryRows=rows;renderSummary();},
   context:()=>({plaza:selector.value,scope:scope()}),
   async activate(data,descriptor,signal){

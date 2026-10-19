@@ -1,3 +1,4 @@
+import {runPhaseSmoke} from './phase-smoke-case.mjs';
 import {runFolderSmoke} from './folder-smoke-case.mjs';
 import { chromium } from 'playwright-core';
 import { createServer } from 'node:http';
@@ -280,6 +281,7 @@ try {
   }
   console.log('CHECK controles e inspector base completados');
   if(process.env.FOLDER_TEST_PATH)await runFolderSmoke({page,baseUrl:`http://127.0.0.1:${server.address().port}${process.env.FOLDER_ENTRY || "/"}`,requests});
+  if(process.env.PHASE_TEST_PATH)await runPhaseSmoke({page,baseUrl:`http://127.0.0.1:${server.address().port}/preview-masiva.html`,requests});
   assert.deepEqual(errors, []);
   if (!process.env.PREVIEW_ONLY && !process.env.FOLDER_ONLY) console.log('PASS Chromium: navegación, búsqueda, GeoJSON sintético bajo demanda, opacidad, respaldo sin token, dibujo/medición, CSV, inspector móvil, muestra privada en memoria resumen de atributos sintéticos, referencia privada declarativa y ámbitos sin fallback ni subida. No certifica metodologías, cobertura territorial ni servicios ion autenticados.');
 } finally { await browser?.close(); await new Promise(done => server.close(done)); }
