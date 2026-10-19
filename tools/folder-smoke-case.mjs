@@ -38,7 +38,7 @@ export async function runFolderSmoke({page,baseUrl,requests}){
   await page.locator('details').filter({has:page.locator('#folder-report')}).last().evaluate(e=>{e.open=true;});
   const reportDownload=page.waitForEvent('download');await page.locator('#folder-report').click();const reportFile=await reportDownload;
   const report=JSON.parse(await readFile(await reportFile.path(),'utf8'));
-  assert.equal(report.contexts.length,36);assert.equal(report.inventory.complete,true);assert.equal(report.totals.files,1255);
+  assert.equal(report.contexts.length,36);assert.equal(report.inventory.complete,true);assert.equal(report.totals.files,1255);assert.equal(report.totals.unmatched,0,'JSON auxiliares no son capas geográficas sin correspondencia');
   assert.equal(report.totals.styleValidationFailed,0);assert.equal(report.contexts.reduce((n,c)=>n+c.styleValidationPassed,0),684);
   assert.equal(report.totals.excluded,144);assert.equal(report.totals.errors,1);
   assert.equal(report.contexts.filter(c=>c.visualizationChecked===1).length,18);

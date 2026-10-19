@@ -10,14 +10,14 @@ function styleFields(value,result=new Set()){
 }
 export function buildFolderCatalog(entries,reference,{complete=false,totalFiles=entries.length,match=e=>matchReferencePath(e.path,e,reference),runtime=new Map(),styleChecks=new Map(),requireStyleValidation=false}={}){
   const layers=entries.map(e=>{
-    const excluded=internal(e);const candidates=excluded?[]:match(e);const template=candidates.length===1?candidates[0]:null;
+    const excluded=internal(e);const geographic=e.kind==='geojson'||e.kind==='error'&&Boolean(e.plaza&&e.scope);const candidates=excluded||!geographic?[]:match(e);const template=candidates.length===1?candidates[0]:null;
     const issues=[];
     if(excluded)issues.push('Contenido interno excluido; no leído ni activable.');
     else {
       if(e.kind==='error'||!e.renderable)issues.push(e.reason??'Archivo no representable.');
       if(!e.plaza||!e.scope)issues.push('Plaza o ámbito sin reconocer.');
-      if(!reference)issues.push('Referencia local pendiente.');
-      else if(!candidates.length)issues.push('Sin correspondencia con la referencia.');
+      if(!reference&&geographic)issues.push('Referencia local pendiente.');
+      else if(reference&&geographic&&!candidates.length)issues.push('Sin correspondencia con la referencia.');
       else if(candidates.length>1)issues.push('Correspondencia ambigua.');
       if(template?.unsupported)issues.push(template.unsupported);
       if(template?.visualWarning)issues.push(template.visualWarning);
@@ -34,12 +34,12 @@ export function buildFolderCatalog(entries,reference,{complete=false,totalFiles=
     const styleValidation=styleChecks.get(e.path)??{status:'not-tested'};
     if(styleValidation.status==='failed')issues.push('Evaluación de simbología fallida: '+styleValidation.reason);
     const activatable=candidate&&(!requireStyleValidation||styleValidation.status==='passed');
-    return {path:e.path,plaza:e.plaza??null,scope:e.scope??null,variable:template?.variable??e.variable??null,logicalId:template?.logicalId??null,name:template?.name??null,variableName:template?.variableName??null,size:e.size??0,kind:e.kind??null,crs:e.crs??null,rootFields:e.rootFields??null,excluded,entities:e.count??null,geometries:e.geometries??{},fields:e.fields?Object.fromEntries(Object.entries(e.fields).map(([k,s])=>[k,{types:s.types,present:s.present,nulls:s.nulls,missing:s.missing}])):null,candidate,styleValidation,mapping:excluded?'excluded':!reference?'pending':candidates.length===1?'unique':candidates.length?'ambiguous':'unmatched',candidates:candidates.map(t=>t.logicalId),activatable,absentStyleFields,incompleteStyleFields,issues,visualization:runtime.get(e.path)??{status:'not-tested'},analysisCertification:'not-certified'};
+    return {path:e.path,plaza:e.plaza??null,scope:e.scope??null,variable:template?.variable??e.variable??null,logicalId:template?.logicalId??null,name:template?.name??null,variableName:template?.variableName??null,size:e.size??0,kind:e.kind??null,crs:e.crs??null,rootFields:e.rootFields??null,excluded,entities:e.count??null,geometries:e.geometries??{},fields:e.fields?Object.fromEntries(Object.entries(e.fields).map(([k,s])=>[k,{types:s.types,present:s.present,nulls:s.nulls,missing:s.missing}])):null,candidate,styleValidation,mapping:excluded?'excluded':!geographic?'not-applicable':!reference?'pending':candidates.length===1?'unique':candidates.length?'ambiguous':'unmatched',candidates:candidates.map(t=>t.logicalId),activatable,absentStyleFields,incompleteStyleFields,issues,visualization:runtime.get(e.path)??{status:'not-tested'},analysisCertification:'not-certified'};
   });
   const contexts=[];
   for(const [plaza,[name]] of Object.entries(PLAZAS))for(const scope of ['city','metro_analysis']){
     const rows=layers.filter(e=>e.plaza===plaza&&e.scope===scope),eligible=rows.filter(e=>!e.excluded);
-    const mapped=eligible.filter(e=>e.mapping==='unique');const present=new Set(mapped.map(e=>e.logicalId));
+    const mapped=eligible.filter(e=>e.kind==='geojson'&&e.mapping==='unique');const present=new Set(mapped.map(e=>e.logicalId));
     const referencedNotFound=reference?reference.templates.filter(t=>!/^V1[5-8]$/.test(t.variable)&&!present.has(t.logicalId)).map(t=>({variable:t.variable,logicalId:t.logicalId,name:t.name,hasOriginalRoute:Boolean(t.paths.length)})):null;
     contexts.push({plaza,name,scope,files:rows.length,bytes:rows.reduce((n,e)=>n+e.size,0),excluded:rows.filter(e=>e.excluded).length,geographicFiles:eligible.filter(e=>e.kind==='geojson').length,entities:eligible.reduce((n,e)=>n+(e.entities??0),0),geometries:eligible.reduce((out,e)=>{for(const [k,n]of Object.entries(e.geometries))out[k]=(out[k]??0)+n;return out;},{}),variables:[...new Set(eligible.map(e=>e.variable).filter(Boolean))].sort(),mappedSublayers:[...present].sort(),availableSublayers:[...new Set(eligible.filter(e=>e.activatable).map(e=>e.logicalId))].sort(),activatableFiles:eligible.filter(e=>e.activatable).length,styleValidationPassed:eligible.filter(e=>e.styleValidation.status==='passed').length,styleValidationFailed:eligible.filter(e=>e.styleValidation.status==='failed').length,errors:eligible.filter(e=>e.kind==='error').length,ambiguous:eligible.filter(e=>e.mapping==='ambiguous').length,unmatched:eligible.filter(e=>e.mapping==='unmatched').length,filesWithMissingStyleFields:eligible.filter(e=>e.absentStyleFields.length||e.incompleteStyleFields.length).length,visualizationChecked:eligible.filter(e=>e.visualization.status==='rendered').length,visualizationErrors:eligible.filter(e=>e.visualization.status==='error').length,referencedNotFound,analysisCertification:'not-certified'});
   }

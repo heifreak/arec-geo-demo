@@ -33,3 +33,7 @@ test('style checks gate activation independently and failed files remain diagnos
  const failed=buildFolderCatalog([e],reference,{styleChecks,requireStyleValidation:true});assert.equal(failed.layers[0].candidate,true);assert.equal(failed.layers[0].activatable,false);assert.equal(failed.contexts[0].styleValidationFailed,1);
  styleChecks.set(e.path,{status:'passed',checked:2,failed:0});assert.equal(buildFolderCatalog([e],reference,{styleChecks,requireStyleValidation:true}).layers[0].activatable,true);
 });
+test('auxiliary JSON is inventoried without pretending it is an unmapped geographic layer',()=>{
+ const r=buildFolderCatalog([{...row(),kind:'metadata-json',renderable:false,count:undefined,fields:undefined}],reference);
+ assert.equal(r.layers[0].mapping,'not-applicable');assert.equal(r.totals.unmatched,0);assert.equal(r.contexts[0].mappedSublayers.length,0);assert.equal(r.contexts[0].referencedNotFound.length,1);
+});
