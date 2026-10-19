@@ -71,3 +71,17 @@ test('el contexto metropolitano no usa ni conserva una capa de ciudad como susti
   manager.setContext('JRZ', 'metro_analysis'); assert.equal(sources.length, 0);
   await assert.rejects(manager.setVisible('test', true), /No se permite sustitución/);
 });
+test('retirar una capa privada pendiente descarta su fuente tardía y libera entradas sin afectar otras',async()=>{
+ let resolve;const {manager,sources}=harness(()=>new Promise(done=>{resolve=done;}));
+ const sample={type:'FeatureCollection',features:[{type:'Feature',properties:{test_id:'sample'},geometry:{type:'Point',coordinates:[0,0]}}]};
+ const layer=manager.addSessionLayer({...entry(),sessionApproved:true,publicApproved:false,bulkLocal:true},sample);
+ const loading=manager.setVisible(layer.id,true);manager.removeSessionLayer(layer.id);resolve({entities:{values:[]}});await loading;
+ assert.equal(sources.length,0);assert.equal(manager.sessionInputs.has(layer.id),false);assert.equal(manager.pending.has(layer.id),false);
+ assert.ok(manager.catalog.layers.some(l=>l.id==='test'));
+});
+test('cambiar plaza libera datos masivos pero conserva las muestras manuales existentes',()=>{
+ const {manager}=harness(async()=>({entities:{values:[]}}));const sample={type:'FeatureCollection',features:[]};
+ const bulk=manager.addSessionLayer({...entry(),sessionApproved:true,publicApproved:false,bulkLocal:true},sample);
+ const manual=manager.addSessionLayer({...entry(),sessionApproved:true,publicApproved:false},sample);
+ manager.setContext('MTY','city');assert.equal(manager.sessionInputs.has(bulk.id),false);assert.equal(manager.sessionInputs.has(manual.id),true);
+});

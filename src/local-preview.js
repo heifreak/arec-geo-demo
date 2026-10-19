@@ -17,7 +17,7 @@ details.innerHTML = `<summary>Demostración privada · archivos de tu computador
 document.querySelector('.left-panel').prepend(details);
 for (let i = 1; i <= 23; i++) { if (i >= 15 && i <= 18) continue; const option = document.createElement('option'); option.value = 'V' + String(i).padStart(2,'0'); option.textContent = option.value; document.getElementById('local-variable').append(option); }
 document.getElementById('local-variable').value = 'V14';
-document.getElementById('scope').value = 'metro_analysis'; document.getElementById('scope').dispatchEvent(new Event('change'));
+if(document.documentElement.dataset.localPreview==='true'){document.getElementById('scope').value = 'metro_analysis'; document.getElementById('scope').dispatchEvent(new Event('change'));}
 async function refreshSublayers() {
   const select=document.getElementById('local-sublayer'); select.replaceChildren(new Option('Regla categórica detectada por campos',''));
   const file=document.getElementById('local-reference').files[0]; if (!file || file.size>2*1024*1024) return;

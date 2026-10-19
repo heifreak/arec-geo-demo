@@ -45,3 +45,14 @@ test('rechaza lookup con efectos y pinturas uniformes contradictorias',async()=>
  const conflicting=uniformHTML.replace("'line-width':1", "'line-width':1").replace("globalThis.__uniformExecuted=true;", "function another(id){const c=colorFor(id);map.addLayer({id:'other',source:'uniform',type:'fill',paint:{'fill-color':c,'fill-opacity':0.9}});}");
  await assert.rejects(descriptorFromHTML(conflicting,JSON.stringify(data),{...context,variable:'V01',logicalId:'synthetic_uniform'}),/contradictorias/);
 });
+
+test('compila catálogo privado sin incluir variables internas y vincula nombres originales de archivo',async()=>{
+ const {compileReferenceHTML,matchReferencePath,descriptorForInventory}=await import('../src/reference-html.js');
+ const {classifyPath}=await import('../src/folder-inventory.js');
+ const variables=Array.from({length:23},(_,i)=>({id:i+1,nombre:'Synthetic '+(i+1),subcapas:i===0?[{id:'synthetic_uniform',nombre:'Synthetic original name'}]:[]}));
+ const catalog=uniformHTML.replace('const registry={variables:[{id:1,subcapas:[{id:\'synthetic_uniform\',nombre:\'Synthetic uniform\'}]}]};',`const registry=${JSON.stringify({variables})};const routes={synthetic_uniform:'../data/{CODE}/evidence/V01/actual_name_{code}.geojson'};`);
+ const compiled=await compileReferenceHTML(catalog);assert.equal(compiled.templates.length,1);assert.equal(compiled.templates[0].name,'Synthetic original name');
+ const path='data/JRZ/evidence_metro/V01/actual_name_jrz.geojson';const matches=matchReferencePath(path,classifyPath(path),compiled);assert.equal(matches.length,1);
+ assert.equal(matchReferencePath('data/JRZ/evidence/V02/actual_name_jrz.geojson',classifyPath('data/JRZ/evidence/V02/actual_name_jrz.geojson'),compiled).length,0);
+ const descriptor=descriptorForInventory(matches[0],data,{plaza:'JRZ',scope:'metro_analysis'});assert.equal(descriptor.bulkLocal,true);assert.equal(descriptor.analysis,undefined,'Un ID genérico no certifica que sea una malla de celdas');
+});

@@ -74,10 +74,10 @@ function comparablePaint(paint) {
       : value
   ])));
 }
-function uniformStyle(extracted, logicalId) {
+function uniformStyle(extracted, logicalId, fallbackMeta, allowLegendMismatch=false) {
   const metas = extracted.objects.flatMap(object => Object.entries(object).filter(([key,value]) => key === logicalId && Array.isArray(value?.legend)).map(([,value])=>value));
   const uniqueMeta=[...new Map(metas.map(meta=>[JSON.stringify(meta),meta])).values()];
-  if (uniqueMeta.length !== 1) throw Error('No hay metadatos únicos para esa subcapa.');
+  if (uniqueMeta.length>1 || !uniqueMeta.length&&!fallbackMeta) throw Error('No hay metadatos únicos para esa subcapa.');
   const paints=[]; const owners=new Set();
   for (const {node,owner} of extracted.dynamicLayers) {
     const localDeclarations=[]; if (owner) walk(owner,item=>{if(item.type==='VariableDeclarator')localDeclarations.push(item);});
@@ -95,7 +95,7 @@ function uniformStyle(extracted, logicalId) {
         if (statement.type!=='VariableDeclaration' || statement.declarations.length!==1 || returned.type!=='ReturnStatement') continue;
         const table=statement.declarations[0]; const access=returned.argument?.type==='LogicalExpression' && returned.argument.operator==='||' ? returned.argument.left : returned.argument;
         if (access?.type!=='MemberExpression' || !access.computed || access.object.name!==table.id.name || access.property.name!==fn.params[0].name) continue;
-        try { const color=literal(table.init)[logicalId]; if (typeof color==='string') colors.add(color); } catch { /* Not a literal lookup. */ }
+        try { const color=literal(table.init)[logicalId] || (returned.argument.type==='LogicalExpression'?literal(returned.argument.right):undefined); if (typeof color==='string') colors.add(color); } catch { /* Not a literal lookup. */ }
       }
       if (colors.size!==1) continue;
       bindings[name]=[...colors][0]; resolved=true;
@@ -106,9 +106,21 @@ function uniformStyle(extracted, logicalId) {
   for (const type of ['fill','line','circle']) if (new Set(paints.filter(p=>p.type===type).map(p=>comparablePaint(p.paint))).size>1) throw Error('Pinturas uniformes contradictorias.');
   if (!paints.some(p=>p.type==='fill') || !paints.some(p=>p.type==='line')) throw Error('No se encontró pintura uniforme completa verificable.');
   const paint=Object.assign({},...paints.map(p=>p.paint)); validatePaint(paint);
-  const meta=uniqueMeta[0];
+  let meta=uniqueMeta[0];
+  if(!meta){
+    const legends=[];
+    for(const fn of extracted.functions.values())walk(fn,node=>{
+      if(node.type!=='ObjectExpression')return;const legend=property(node,'legend');
+      if(legend?.type!=='ArrayExpression'||legend.elements.length!==1)return;
+      const pair=legend.elements[0];if(pair?.type!=='ArrayExpression'||pair.elements[0]?.type!=='Identifier')return;
+      try {const entries=literal(legend,{[pair.elements[0].name]:paint['fill-color']});const formula=literal(property(node,'formula'));legends.push({entries,formula});}catch{}
+    });
+    const defaults=[...new Map(legends.map(value=>[JSON.stringify(value),value])).values()];
+    if(defaults.length!==1)throw Error('Leyenda de respaldo original ambigua o ausente.');
+    meta={...fallbackMeta,legend:defaults[0].entries,formula:defaults[0].formula};
+  }
   if (!meta.legend.every(pair=>Array.isArray(pair) && pair.length===2 && pair.every(value=>typeof value==='string'))) throw Error('Leyenda uniforme inválida.');
-  if (!meta.legend.some(pair=>pair[0]?.toLowerCase()===paint['fill-color']?.toLowerCase())) throw Error('La leyenda no corresponde al color original.');
+  if (!allowLegendMismatch && !meta.legend.some(pair=>pair[0]?.toLowerCase()===paint['fill-color']?.toLowerCase())) throw Error('La leyenda no corresponde al color original.');
   return {layer:{id:logicalId},paint,meta};
 }
 export async function descriptorFromHTML(html, geoText, { plaza, scope, variable, logicalId }) {
@@ -146,4 +158,54 @@ export async function descriptorFromHTML(html, geoText, { plaza, scope, variable
   const hash = await sha256(geoText); const reference = `Referencia HTML local SHA256 ${await sha256(html)}`;
   const temporalEvidence=[...new Set(data.features.flatMap(feature=>Object.values(feature.properties).filter(value=>typeof value==='string' && /GHSL/i.test(value))))];
   return { temporalEvidence, plaza, scope, variable, name: layer.id, source: meta.source ?? 'Referencia local', methodology: meta.method ?? 'Método no documentado', formula: meta.formula ?? 'Sin fórmula adicional', legend: meta.legend.map(pair => pair[1]).join(' · '), legendEntries: meta.legend, approvalReference: reference, style: { color: meta.legend[0][0], opacity: 1, paint, reference }, inputEvidence: { sha256: hash, featureCount: data.features.length }, analysis: { reference: `Atributos originales del archivo SHA256 ${hash}; sin recalcular`, scope: 'sample', cellIdField: idFields[0], classField: field, metrics: [] }, inspection: { reference, groups: [{ label: 'Campos originales · sin recalcular', fields: [...new Set(data.features.flatMap(f => Object.keys(f.properties)))].map(key => ({ field: key, label: key, note: 'Valor original. No se infieren unidades ni se agregan valores por celda.' })) }] }, warnings: ['Referencia leída como texto/AST, sin ejecutar el HTML.', 'Correspondencia visual, no certificación del cálculo original ni de la cobertura.', 'Se conservan atributos y clases precalculados; no se suman poblaciones ni densidades.'], sessionOnly: true, publicApproved: false };
+}
+
+/** Compile private definitions at runtime; never store this result in public assets. */
+export async function compileReferenceHTML(html) {
+  const extracted=extractHTML(html);
+  const catalogs=extracted.objects.filter(o=>Array.isArray(o.variables)&&o.variables.length===23&&o.variables.every(v=>Number.isInteger(v.id)&&Array.isArray(v.subcapas)));
+  const catalog=[...new Map(catalogs.map(c=>[JSON.stringify(c),c])).values()];
+  if(catalog.length!==1)throw Error('No hay un catálogo único de 23 variables en la referencia.');
+  const reference=`Referencia local SHA256 ${await sha256(html)}`; const templates=[];
+  for(const variable of catalog[0].variables){
+    const variableId='V'+String(variable.id).padStart(2,'0');if(/^V1[5-8]$/.test(variableId))continue;
+    for(const sub of variable.subcapas){
+      const paths=[...new Set(extracted.objects.flatMap(object=>{
+        const value=object[sub.id];return(typeof value==='string'?[value]:Array.isArray(value)?value:[]).filter(item=>typeof item==='string'&&/\.geojson$/i.test(item));
+      }))];
+      const template={logicalId:sub.id,variable:variableId,variableName:variable.nombre,name:sub.nombre,paths,reference};
+      try {
+        const metaValues=extracted.objects.flatMap(object=>object[sub.id]?.legend?[object[sub.id]]:[]);
+        const meta=[...new Map(metaValues.map(m=>[JSON.stringify(m),m])).values()];
+        if(meta.length>1)throw Error('Metadatos o leyenda ambiguos.');
+        const sets=extracted.objects.flatMap(object=>Array.isArray(object[sub.id])?[object[sub.id]]:[]).filter(ids=>ids.length&&ids.every(id=>typeof id==='string'&&extracted.layers.some(layer=>layer.id===id)));
+        const unique=[...new Map(sets.map(ids=>[JSON.stringify(ids),ids])).values()];
+        let paint;
+        if(unique.length===1&&!meta.length)throw Error('Metadatos de estilo específico ausentes.');
+        if(unique.length===1)paint=Object.assign({},...extracted.layers.filter(layer=>unique[0].includes(layer.id)).map(layer=>layer.paint));
+        else if(unique.length>1)throw Error('Identificadores de pintura ambiguos.');
+        else { const recovered=uniformStyle(extracted,sub.id,{source:sub.fuente??variable.fuente_base,method:JSON.stringify({geometria:sub.geometria,funcion_espacial:sub.funcion_espacial,efecto:sub.efecto})},true);paint=recovered.paint;if(!meta.length)meta.push(recovered.meta); }
+        validatePaint(paint);Object.assign(template,{paint,meta:meta[0]});
+        if(typeof paint['fill-color']==='string'&&!template.meta.legend.some(pair=>pair[0].toLowerCase()===paint['fill-color'].toLowerCase()))template.visualWarning='La referencia dibuja un color uniforme que no coincide con su leyenda gradual. Se conserva lo implementado, sin inventar umbrales.';
+      } catch(error){template.unsupported=error.message;}
+      templates.push(template);
+    }
+  }
+  return {reference,templates};
+}
+export function matchReferencePath(path,route,bundle) {
+  if(!['recognized','base-or-metadata'].includes(route.status)||!route.scope||!bundle)return [];
+  const filename=path.split('/').at(-1).toLowerCase();
+  return bundle.templates.filter(t=>(!route.variable||t.variable===route.variable)&&t.paths.some(pattern=>pattern.split('/').at(-1).replaceAll('{CODE}',route.plaza).replaceAll('{code}',route.plaza.toLowerCase()).toLowerCase()===filename));
+}
+export function descriptorForInventory(template,data,route) {
+  if(!template?.paint||template.unsupported)throw Error('Simbología pendiente de referencia compatible.');
+  const fields=[...new Set(data.features.flatMap(f=>Object.keys(f.properties)))];
+  const ids=fields.filter(field=>/(?:cell|celda|grid).*id|id.*(?:cell|celda|grid)/i.test(field)&&data.features.every(f=>typeof f.properties[field]==='string'&&f.properties[field].trim())&&new Set(data.features.map(f=>f.properties[field])).size===data.features.length);
+  const expression=template.paint['fill-color'];
+  const classField=Array.isArray(expression)&&expression[0]==='match'&&expression[1]?.[0]==='get'?expression[1][1]:undefined;
+  const temporalEvidence=[...new Set(data.features.flatMap(f=>Object.values(f.properties).filter(v=>typeof v==='string'&&/GHSL/i.test(v))))].slice(0,100);
+  const descriptor={plaza:route.plaza,scope:route.scope,variable:template.variable,logicalId:template.logicalId,name:template.name,source:template.meta.source??'Referencia local',methodology:template.meta.method??'Método pendiente de documentación',formula:template.meta.formula??'Sin regla adicional',legendEntries:template.meta.legend,legend:template.meta.legend.map(pair=>pair[1]).join(' · '),approvalReference:template.reference,style:{color:template.meta.legend[0][0],opacity:1,paint:template.paint,reference:template.reference},inspection:{reference:template.reference,groups:[{label:'Atributos originales del archivo',fields:fields.map(field=>({field,label:field,note:'Valor precalculado; unidades y método no se infieren del nombre.'}))}]},temporalEvidence,bulkLocal:true,warnings:[...(template.visualWarning?[template.visualWarning]:[]),'Archivo privado seleccionado por el usuario; no autorizado para publicación.','Disponibilidad de atributos no certifica su cálculo ni cobertura. Se conserva la simbología implementada en la referencia, sin nuevas clases.']};
+  if(ids.length===1&&data.features.every(f=>['Polygon','MultiPolygon'].includes(f.geometry?.type)))descriptor.analysis={cellIdField:ids[0],classField,metrics:[],scope:'sample',reference:`Atributos originales · ${template.reference}; sin recalcular`};
+  return descriptor;
 }

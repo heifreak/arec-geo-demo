@@ -33,3 +33,5 @@ El inspector puede organizar campos mediante un descriptor privado, conservando 
 Para revisar tus archivos desde tu computadora sin rutas internas ni servidor, descarga el HTML nuevo del visor de la rama y sigue la [demostración privada local](docs/private-preview.md). El botón de descarga genera el descriptor en tu navegador a partir de tus archivos locales.
 
 La comparación de capas privadas exige identificadores únicos y geometrías exactas en la misma plaza y ámbito. Muestra valores originales y procedencia temporal declarada; una celda sin registro en una subcapa no se interpreta como valor cero.
+
+La [importación de carpeta completa](docs/folder-import.md) permite elegir `data` una vez, inventariar las 18 plazas y activar capas en memoria bajo demanda desde un origen web normal. Los estilos se vinculan con referencias privadas locales; si no están dentro de `data`, se elige el V15 una sola vez. Incluye cancelación, límites de memoria y copia local opt-in en IndexedDB; no incluye ZIP ni publicación de datos.

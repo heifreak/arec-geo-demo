@@ -1,3 +1,4 @@
+import {runFolderSmoke} from './folder-smoke-case.mjs';
 import { chromium } from 'playwright-core';
 import { createServer } from 'node:http';
 import { readFile, mkdir } from 'node:fs/promises';
@@ -36,7 +37,7 @@ try {
   page.on('request', request => requests.push({ method: request.method(), url: request.url() }));
   // Synthetic test data only. Never written to the public data catalog.
   const fixture = { id: 'synthetic-test', plaza: 'JRZ', variable: 'V01', name: 'Fixture sintética de prueba', url: 'data/synthetic-test.geojson', publicApproved: true, approvalReference: 'test-only', legend: 'Símbolo de prueba, no V14', style: { color: '#ffffff', opacity: 1 } };
-  let useFixture = true;
+  let useFixture = !process.env.FOLDER_ONLY;
   await page.route('**/data/catalog.json', route => route.fulfill({ json: { version: 1, layers: useFixture ? [fixture] : [] } }));
   let layerRequests = 0;
   await page.route('**/data/synthetic-test.geojson', route => {
@@ -44,7 +45,7 @@ try {
     return route.fulfill({ json: { type: 'FeatureCollection', features: [{ type: 'Feature', properties: { name: 'Muestra sintética', cell_id: 'TEST-ONLY', literal: '<script>no ejecutar</script>' }, geometry: { type: 'Point', coordinates: [-106.4245, 31.6904] } }] } });
   });
   await page.goto(`http://127.0.0.1:${server.address().port}/`, { waitUntil: 'networkidle', timeout: 60000 });
-  if (!process.env.PREVIEW_ONLY) {
+  if (!process.env.PREVIEW_ONLY && !process.env.FOLDER_ONLY) {
   assert.equal(await page.locator('#plaza option').count(), 18);
   assert.equal(layerRequests, 0, 'No precargar GeoJSON');
   await page.locator('#capas input[type=checkbox]').check();
@@ -52,7 +53,7 @@ try {
   assert.equal(layerRequests, 1);
   // Wait for the documented 2-second flight, then inspect the fixture at the focus point.
   await page.waitForTimeout(2200);
-  await page.mouse.click(720, 480);
+  await page.mouse.click(720, 465); // Interior of the marker, not its transparent lower edge.
   await page.waitForFunction(() => document.getElementById('atributos').textContent.includes('TEST-ONLY'));
   assert.match(await page.locator('#atributos').textContent(), /<script>no ejecutar<\/script>/);
   assert.equal(await page.locator('#atributos script').count(), 0);
@@ -262,6 +263,7 @@ try {
     assert.equal(requests.some(r=>!['GET','HEAD'].includes(r.method)),false);
     console.log('PASS HTML autónomo por HTTP (file:// bloqueado por política del entorno): referencia original leída sin ejecutar, descriptor descargado con pintura y leyenda exactas, capa real, celda e inspector originales, limpieza y recarga sin datos persistentes.');
   }
+  if(process.env.FOLDER_TEST_PATH)await runFolderSmoke({page,baseUrl:`http://127.0.0.1:${server.address().port}/`,requests});
   assert.deepEqual(errors, []);
-  if (!process.env.PREVIEW_ONLY) console.log('PASS Chromium: navegación, búsqueda, GeoJSON sintético bajo demanda, opacidad, respaldo sin token, dibujo/medición, CSV, inspector móvil, muestra privada en memoria resumen de atributos sintéticos, referencia privada declarativa y ámbitos sin fallback ni subida. No certifica metodologías, cobertura territorial ni servicios ion autenticados.');
+  if (!process.env.PREVIEW_ONLY && !process.env.FOLDER_ONLY) console.log('PASS Chromium: navegación, búsqueda, GeoJSON sintético bajo demanda, opacidad, respaldo sin token, dibujo/medición, CSV, inspector móvil, muestra privada en memoria resumen de atributos sintéticos, referencia privada declarativa y ámbitos sin fallback ni subida. No certifica metodologías, cobertura territorial ni servicios ion autenticados.');
 } finally { await browser?.close(); await new Promise(done => server.close(done)); }

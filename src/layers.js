@@ -58,18 +58,18 @@ export class LayerManager {
   }
   setContext(plaza, scope) {
     if (!Object.hasOwn(PLAZAS, plaza) || !['city', 'municipality', 'metro_analysis', 'metro_official'].includes(scope)) throw new Error('Contexto territorial inválido.');
+    for(const layer of [...this.catalog.layers])if(layer.bulkLocal)this.removeSessionLayer(layer.id);
     this.clear(); this.context = { plaza, scope };
   }
-  removeSessionLayers() {
-    for (const layer of this.catalog.layers.filter(layer => layer.sessionOnly)) {
-      const source = this.loaded.get(layer.id);
-      if (source) this.viewer.dataSources.remove(source, true);
-      this.loaded.delete(layer.id); this.pending.delete(layer.id); this.desired.delete(layer.id);
-      this.originalRows.delete(layer.id); this.opacities.delete(layer.id);
-    }
-    this.sessionInputs.clear();
-    this.catalog = { ...this.catalog, layers: this.catalog.layers.filter(layer => !layer.sessionOnly) };
+  removeSessionLayer(id) {
+    const layer=this.catalog.layers.find(item=>item.id===id&&item.sessionOnly); if(!layer)return;
+    const source=this.loaded.get(id);if(source)this.viewer.dataSources.remove(source,true);
+    for(const map of [this.loaded,this.pending,this.desired,this.originalRows,this.opacities,this.sessionInputs])map.delete(id);
+    this.catalog={...this.catalog,layers:this.catalog.layers.filter(item=>item.id!==id)};
     this.viewer.scene?.requestRender();
+  }
+  removeSessionLayers() {
+    for(const layer of [...this.catalog.layers])if(layer.sessionOnly)this.removeSessionLayer(layer.id);
   }
   clear() {
     this.epoch++;

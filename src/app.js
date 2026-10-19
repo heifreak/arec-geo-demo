@@ -35,6 +35,7 @@ $('toggle-inspector').addEventListener('click', () => {
   $('toggle-inspector').setAttribute('aria-expanded', String(open));
 });
 const selector = $('plaza');
+let folderInventoryRows=[];
 let privateReference = null; let selectedLogicalId = null; let selectedLayerId = null;
 const scope = () => $('scope').value;
 const inContext = layer => layer.plaza === selector.value && (layer.scope ?? 'city') === scope();
@@ -52,7 +53,7 @@ function focusPlaza(code) {
 function changePlaza() {
   layers.setContext(selector.value, scope()); drawing.clear(); $('cell-comparison').replaceChildren(); $('cell-inspection').replaceChildren(); $('atributos').textContent = 'Selecciona una entidad de una capa cargada.'; $('coincidentes').replaceChildren(); $('selected-layer').textContent = 'Ninguna'; $('layer-method').textContent = ''; $('layer-legend').replaceChildren();
   selectedLayerId = null; $('selected-opacity').disabled = true;
-  focusPlaza(selector.value); renderLayers(); renderSummary(); renderReferenceTree();
+  focusPlaza(selector.value); renderLayers(); renderSummary(); renderReferenceTree(); window.dispatchEvent(new Event('arec-context-changed'));
   if (privateReference && selectedLogicalId) {
     const template = privateReference.templates.find(template => template.logicalId === selectedLogicalId);
     if (template) selectLayerMetadata(template);
@@ -174,7 +175,7 @@ function renderLayers() {
     });
     toggle.addEventListener('change', async () => {
       toggle.disabled = true; status.textContent = 'Cargando…';
-      try { await layers.setVisible(layer.id, toggle.checked); layers.setOpacity(layer.id, Number(opacity.value)); status.textContent = toggle.checked ? 'Capa visible' : 'Capa oculta'; }
+      try { if(layer.bulkLocal&&!toggle.checked){folderAPI.remove(layer.id);return;} await layers.setVisible(layer.id, toggle.checked); layers.setOpacity(layer.id, Number(opacity.value)); status.textContent = toggle.checked ? 'Capa visible' : 'Capa oculta'; }
       catch { toggle.checked = false; status.textContent = 'No se pudo cargar la capa. Revisa el archivo y la conexión.'; }
       finally { toggle.disabled = false; frame.disabled = !toggle.checked; renderSummary(); renderReferenceTree(); if (viewer.selectedEntity) describeEntity(viewer.selectedEntity); }
     });
@@ -203,7 +204,7 @@ function summary() {
     const source = layers.loaded.get(layer.id);
     if (source) dataRows.push(...layerSummaryRows(layer, source, viewer.clock.currentTime, layers.originalRows.get(layer.id)));
   }
-  return [...rows.slice(0, 3), ...dataRows, ...rows.slice(3)];
+  return [...rows.slice(0, 3), ...folderInventoryRows, ...dataRows, ...rows.slice(3)];
 }
 function renderSummary() {
   const target = $('summary'); target.replaceChildren();
@@ -235,7 +236,7 @@ $('print-report').addEventListener('click', () => { if (!hasSessionData() || win
 })).then(catalog => { layers.setCatalog(catalog); renderLayers(); renderSummary(); }).catch(() => { $('capas').textContent = 'Catálogo no disponible o inválido. El mapa sigue disponible.'; });
 selector.value = 'JRZ'; layers.setContext('JRZ', scope()); focusPlaza('JRZ'); renderSummary();
 
-function hasSessionData() { return layers.catalog.layers.some(layer => layer.sessionOnly && layers.loaded.has(layer.id)); }
+function hasSessionData() { return folderInventoryRows.length>0 || layers.catalog.layers.some(layer => layer.sessionOnly && layers.loaded.has(layer.id)); }
 $('session-form').addEventListener('submit', async event => {
   event.preventDefault();
   const status = $('session-status');
@@ -257,7 +258,7 @@ $('session-form').addEventListener('submit', async event => {
   } catch (error) { status.textContent = `Muestra no cargada: ${error.message}`; }
 });
 $('session-clear').addEventListener('click', () => {
-  layers.removeSessionLayers(); viewer.selectedEntity = undefined; $('coincidentes').replaceChildren();
+  layers.removeSessionLayers(); window.dispatchEvent(new Event('arec-all-session-cleared')); viewer.selectedEntity = undefined; $('coincidentes').replaceChildren();
   selectedLayerId = null; $('selected-opacity').disabled = true; $('selected-layer').textContent = 'Ninguna'; $('layer-method').textContent = ''; $('layer-legend').replaceChildren();
   $('cell-comparison').replaceChildren(); $('cell-inspection').replaceChildren(); $('atributos').textContent = 'Selecciona una entidad de una capa cargada.';
   renderLayers(); renderSummary(); renderReferenceTree(); $('session-status').textContent = 'Referencias a muestras retiradas de la sesión. No implica borrado seguro de memoria ni de copias descargadas.';
@@ -335,3 +336,19 @@ $('reference-form').addEventListener('submit', async event => {
 $('reference-clear').addEventListener('click', () => { privateReference = null; selectedLogicalId = null; renderReferenceTree(); $('selected-layer').textContent = 'Ninguna'; $('layer-method').textContent = ''; $('layer-legend').replaceChildren(); $('reference-status').textContent = 'Referencia retirada de la memoria de sesión. No se eliminan muestras ya cargadas; usa Retirar muestras para ello.'; });
 $('layer-search').addEventListener('input', renderReferenceTree);
 renderReferenceTree();
+
+export const folderAPI={
+  setInventoryRows(rows){folderInventoryRows=rows;renderSummary();},
+  context:()=>({plaza:selector.value,scope:scope()}),
+  async activate(data,descriptor,signal){
+    signal.throwIfAborted(); const layer=layers.addSessionLayer({...descriptor,sessionApproved:true,publicApproved:false},data);
+    const abort=()=>folderAPI.remove(layer.id);signal.addEventListener('abort',abort,{once:true});
+    try {await layers.setVisible(layer.id,true);signal.throwIfAborted();renderLayers();renderSummary();return layer.id;}
+    catch(error){folderAPI.remove(layer.id);throw error;}
+    finally{signal.removeEventListener('abort',abort);}
+  },
+  remove(id){
+    layers.removeSessionLayer(id);viewer.selectedEntity=undefined;$('coincidentes').replaceChildren();$('cell-inspection').replaceChildren();$('cell-comparison').replaceChildren();$('atributos').textContent='Selecciona una entidad de una capa cargada.';
+    renderLayers();renderSummary();window.dispatchEvent(new CustomEvent('arec-layer-removed',{detail:id}));
+  }
+};
