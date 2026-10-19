@@ -48,3 +48,14 @@ El archivo de referencia se recibió mediante el mecanismo privado, con integrid
 - Las comprobaciones de reglas visuales no validan las metodologías como modelos aprobados, ni demuestran datos auténticos, equivalencia visual exacta entre motores, disponibilidad de todas las fuentes o autenticación ion. El piloto territorial real sigue pendiente.
 
 El siguiente documento solicitado es exclusivamente la Especificación Técnica Rectora del 14 de octubre. No se reintentan enlaces bloqueados ni se marca el PR como listo.
+
+## Importador masivo y reconciliación del PR (19 de octubre de 2026)
+
+Se preservó el trabajo local antes de integrar `f045d36`. La vista experimental fue sustituida por el importador completo: `preview-masiva.html` y `preview.html` son artefactos idénticos generados junto con `src/viewer.bundle.js`. No contienen las definiciones privadas ni los datos originales.
+
+- 56 pruebas unitarias y 12 espaciales aprobadas; comprobación de sintaxis de fuentes y herramientas y compilación reproducible por SHA-256.
+- Chromium sobre el HTML descargable servido sin modificaciones: 1.255 archivos sintéticos, 18 plazas, inventario progresivo, cancelación/reimportación, internos sin leer, carga/liberación bajo demanda, inspector y persistencia con consentimiento, fallo de cuota, cancelación de guardado, restauración y borrado.
+- Dos archivos privados reales de Juárez y la referencia local, fuera del checkout: V13/V14 simultáneas, selección del identificador esperado tras el vuelo y preparación de primitivas, comparación exacta de todos los atributos originales y evidencia temporal. Ninguna solicitud de subida; sin capturas de los originales.
+- Regresión Chromium de navegación, Home, búsqueda, opacidad, respaldo sin token, herramientas, CSV, inspector móvil y referencias declarativas. Las esperas de selección están acotadas y exigen la entidad esperada; no sustituyen selecciones por resultados simulados.
+
+No equivale a validar los 1.255 archivos corporativos completos, sus metodologías o su cobertura. ZIP pendiente; dibujo limitado a 25 MiB / 50.000 entidades por archivo, seis capas y 64 MiB de archivos activos. Ion autenticado sigue pendiente. `file://` devuelve `ERR_BLOCKED_BY_ADMINISTRATOR` en Chromium administrado: la apertura directa debe confirmarse en Chrome/Edge del usuario. Cesium y mapas base necesitan Internet. No se desplegó GitHub Pages ni se modificó `main`.

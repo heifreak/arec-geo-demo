@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import {readFile}from'node:fs/promises';
 export async function runFolderSmoke({page,baseUrl,requests}){
+  // The preceding regression checks mobile; picks below use desktop canvas coordinates.
+  await page.setViewportSize({width:1440,height:1000});
   await page.goto(baseUrl,{waitUntil:'networkidle',timeout:60000});
   await page.selectOption('#scope','metro_analysis');
   // Cancel while work is active, before automation round trips let tiny fixtures finish.

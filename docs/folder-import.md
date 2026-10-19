@@ -2,7 +2,7 @@
 
 Abre la versión de esta rama del visor y usa **Carpeta AREC GEO · importación masiva privada**. Selecciona una vez la carpeta `data` extraída. No elijas cientos de archivos por separado. La selección autoriza su lectura local; el importador no envía originales a servidores, mapas ni GitHub.
 
-El código funciona desde un origen web normal: el servidor entrega solo el visor, mientras File API entrega los archivos elegidos al navegador. No hay que copiar los datos al directorio público del servidor. Esta rama incluye además `preview.html`, que se descarga con **Download raw file** desde GitHub. No se ha desplegado la rama en GitHub Pages. La apertura `file://` sigue sin poder probarse en el Chromium administrado de Codex; las pruebas usan HTTP interno. Se recomienda un origen HTTPS para las APIs del navegador.
+El código funciona desde un origen web normal: el servidor entrega solo el visor, mientras File API entrega los archivos elegidos al navegador. No hay que copiar los datos al directorio público del servidor. Esta rama incluye además `preview.html` y su alias idéntico `preview-masiva.html`, que se descarga con **Download raw file** desde GitHub. No se ha desplegado la rama en GitHub Pages. La apertura `file://` sigue sin poder probarse en el Chromium administrado de Codex; las pruebas usan HTTP interno. Se recomienda un origen HTTPS para las APIs del navegador.
 
 ## Flujo
 
@@ -42,6 +42,6 @@ Tras recargar, **Restaurar copia local** recupera el catálogo sin volver a sele
 
 ## Validación reproducible
 
-`npm test` cubre rutas, streaming UTF8/BOM, esquema, cancelación, límites, claves especiales, identificadores y liberación de fuentes pendientes. `npm run build:preview` genera tanto `src/viewer.bundle.js` para el origen web normal como `preview.html` autónomo y su worker. CI comprueba que ambos coincidan con las fuentes.
+`npm test` cubre rutas, streaming UTF8/BOM, esquema, cancelación, límites, claves especiales, identificadores y liberación de fuentes pendientes. `npm run build:preview` genera tanto `src/viewer.bundle.js` para el origen web normal como `preview.html` / `preview-masiva.html` autónomos y su worker. CI comprueba que los tres archivos generados coincidan con las fuentes.
 
-La prueba de navegador usa `FOLDER_ONLY=1`, `FOLDER_TEST_PATH` para una carpeta sintética de 1.255 archivos y `FOLDER_ACTUAL_PATH` / `FOLDER_ACTUAL_PLAN_PATH` para una carpeta privada pequeña autorizada. No incorpora esas carpetas al checkout ni captura pantallas de los datos privados. La validación de una carpeta sintética y dos capas reales no equivale a haber probado el corpus corporativo completo de 1.255 originales.
+La prueba de navegador usa `FOLDER_ONLY=1`, `FOLDER_TEST_PATH` para una carpeta sintética de 1.255 archivos y `FOLDER_ACTUAL_PATH` / `FOLDER_ACTUAL_PLAN_PATH` para una carpeta privada pequeña autorizada. `FOLDER_ENTRY=/preview-masiva.html` repite la comprobación sobre el HTML descargable servido sin modificaciones. No incorpora esas carpetas al checkout ni captura pantallas de los datos privados. La validación de una carpeta sintética y dos capas reales no equivale a haber probado el corpus corporativo completo de 1.255 originales.

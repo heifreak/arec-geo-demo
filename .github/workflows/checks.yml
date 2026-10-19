@@ -10,8 +10,8 @@ jobs:
           node-version: 24
       - run: npm ci
       - run: npm test
-      - run: npm run build:preview && git diff --exit-code -- preview.html src/viewer.bundle.js
-      - run: node --check src/app.js && node --check src/layers.js && node --check src/providers.js && node --check src/measurements.js
+      - run: npm run build:preview && git diff --exit-code -- preview.html preview-masiva.html src/viewer.bundle.js
+      - run: node --check src/bulk-preview.js && node --check src/app.js && node --check src/layers.js && node --check src/providers.js && node --check src/measurements.js
 
   spatial:
     runs-on: ubuntu-latest

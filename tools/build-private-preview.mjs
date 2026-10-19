@@ -13,4 +13,5 @@ html=html.replace('<html lang="es">','<html lang="es" data-local-preview="true">
 if(html.includes('src="./src/viewer.bundle.js"'))throw Error('Preview was not bundled');
 html=html.replace('<head>',()=>`<head>\n<!-- Third-party licenses\n${notices.join('\n\n').replaceAll('--','—')} -->`);
 await writeFile('preview.html',html);
+await writeFile('preview-masiva.html',html);
 console.log('Visor web y HTML descargable generados con worker local. Sin referencias ni datos corporativos.');

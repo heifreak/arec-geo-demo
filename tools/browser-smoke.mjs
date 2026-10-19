@@ -22,6 +22,7 @@ try {
     args: ['--no-sandbox', '--disable-dev-shm-usage', '--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'],
     env: { ...process.env, XDG_CACHE_HOME: '/tmp/arec-browser-cache', XDG_CONFIG_HOME: '/tmp/arec-browser-config' } });
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+  page.setDefaultTimeout(45000);
   if (process.env.AREC_TLS_TRANSPORT === 'curl') {
     // Same HTTPS resources; curl verifies the platform CA. No ignore-certificate flags.
     const run = promisify(execFile);
@@ -44,6 +45,7 @@ try {
     layerRequests++;
     return route.fulfill({ json: { type: 'FeatureCollection', features: [{ type: 'Feature', properties: { name: 'Muestra sintética', cell_id: 'TEST-ONLY', literal: '<script>no ejecutar</script>' }, geometry: { type: 'Point', coordinates: [-106.4245, 31.6904] } }] } });
   });
+  console.log('CHECK inicio del visor Chromium');
   await page.goto(`http://127.0.0.1:${server.address().port}/`, { waitUntil: 'networkidle', timeout: 60000 });
   if (!process.env.PREVIEW_ONLY && !process.env.FOLDER_ONLY) {
   assert.equal(await page.locator('#plaza option').count(), 18);
@@ -53,8 +55,14 @@ try {
   assert.equal(layerRequests, 1);
   // Wait for the documented 2-second flight, then inspect the fixture at the focus point.
   await page.waitForTimeout(2200);
-  await page.mouse.click(720, 465); // Interior of the marker, not its transparent lower edge.
-  await page.waitForFunction(() => document.getElementById('atributos').textContent.includes('TEST-ONLY'));
+  let markerPicked=false;
+  for(let attempt=0;attempt<12&&!markerPicked;attempt++){
+    await page.mouse.click(720,465); // Interior of the marker, not its transparent lower edge.
+    await page.waitForTimeout(750);
+    markerPicked=(await page.locator('#atributos').textContent()).includes('TEST-ONLY');
+  }
+  if(!markerPicked)await page.screenshot({path:'/tmp/arec-synthetic-pick-failure.png'});
+  assert.ok(markerPicked,'Seleccionar el marcador sintético real después del vuelo');
   assert.match(await page.locator('#atributos').textContent(), /<script>no ejecutar<\/script>/);
   assert.equal(await page.locator('#atributos script').count(), 0);
   await page.locator('#capas input[type=checkbox]').uncheck();
@@ -89,6 +97,7 @@ try {
   const download = await downloaded; assert.match(download.suggestedFilename(), /JRZ\.csv$/);
   const text = await readFile(await download.path(), 'utf8');
   assert.match(text, /No disponible/); assert.doesNotMatch(text, /100%/);
+  console.log('CHECK navegación y controles 3D');
   // Private-session flow uses synthetic attributes only; no AREC field names or colors inferred.
   await page.locator('details').filter({ has: page.locator('#session-form') }).locator('summary').click();
   const descriptor = { plaza: 'JRZ', variable: 'V01', name: 'Synthetic private cell', approvalReference: 'synthetic-only', legend: 'Synthetic, not V14', style: { color: '#ffffff', opacity: 1, categoryField: 'test_class', reference: 'synthetic-only', categories: [{ value: 'X', label: 'Synthetic X', color: '#112233' }] }, analysis: { reference: 'synthetic-only', scope: 'sample', cellIdField: 'test_id', classField: 'test_class', metrics: [{ id: 'test_metric', field: 'test_value', label: 'Synthetic total', unit: 'test-units', aggregation: 'sum', reference: 'synthetic-only' }] } };
@@ -103,8 +112,14 @@ try {
   await page.getByText('Capa visible', { exact: true }).waitFor();
   assert.match(await page.locator('#summary').textContent(), /celdas únicas en archivo cargado1/);
   assert.match(await page.locator('#summary').textContent(), /Synthetic total \(test-units; sum\)7/);
-  await page.waitForTimeout(1500); await page.mouse.click(720, 500);
-  await page.waitForFunction(() => document.getElementById('atributos').textContent.includes('TEST-PRIVATE-1'));
+  // Cesium ground primitives may finish after the documented camera flight.
+  await page.waitForTimeout(2200);
+  let privatePicked=false;
+  for(let attempt=0;attempt<12&&!privatePicked;attempt++){
+    await page.mouse.click(720,500);await page.waitForTimeout(750);
+    privatePicked=await page.locator('#atributos').textContent().then(text=>text.includes('TEST-PRIVATE-1'));
+  }
+  assert.ok(privatePicked,'Seleccionar la celda sintética original tras el vuelo y las primitivas');
   assert.equal(requests.some(request => !['GET', 'HEAD'].includes(request.method)), false, 'Sin subidas de archivos');
   assert.equal(requests.some(request => /private-session|do-not-request/.test(request.url)), false, 'Sin filtrar contenido a solicitudes externas');
   await page.locator('#session-clear').click();
@@ -263,7 +278,8 @@ try {
     assert.equal(requests.some(r=>!['GET','HEAD'].includes(r.method)),false);
     console.log('PASS HTML autónomo por HTTP (file:// bloqueado por política del entorno): referencia original leída sin ejecutar, descriptor descargado con pintura y leyenda exactas, capa real, celda e inspector originales, limpieza y recarga sin datos persistentes.');
   }
-  if(process.env.FOLDER_TEST_PATH)await runFolderSmoke({page,baseUrl:`http://127.0.0.1:${server.address().port}/`,requests});
+  console.log('CHECK controles e inspector base completados');
+  if(process.env.FOLDER_TEST_PATH)await runFolderSmoke({page,baseUrl:`http://127.0.0.1:${server.address().port}${process.env.FOLDER_ENTRY || "/"}`,requests});
   assert.deepEqual(errors, []);
   if (!process.env.PREVIEW_ONLY && !process.env.FOLDER_ONLY) console.log('PASS Chromium: navegación, búsqueda, GeoJSON sintético bajo demanda, opacidad, respaldo sin token, dibujo/medición, CSV, inspector móvil, muestra privada en memoria resumen de atributos sintéticos, referencia privada declarativa y ámbitos sin fallback ni subida. No certifica metodologías, cobertura territorial ni servicios ion autenticados.');
 } finally { await browser?.close(); await new Promise(done => server.close(done)); }
