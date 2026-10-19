@@ -59,3 +59,14 @@ Se preservó el trabajo local antes de integrar `f045d36`. La vista experimental
 - Regresión Chromium de navegación, Home, búsqueda, opacidad, respaldo sin token, herramientas, CSV, inspector móvil y referencias declarativas. Las esperas de selección están acotadas y exigen la entidad esperada; no sustituyen selecciones por resultados simulados.
 
 No equivale a validar los 1.255 archivos corporativos completos, sus metodologías o su cobertura. ZIP pendiente; dibujo limitado a 25 MiB / 50.000 entidades por archivo, seis capas y 64 MiB de archivos activos. Ion autenticado sigue pendiente. `file://` devuelve `ERR_BLOCKED_BY_ADMINISTRATOR` en Chromium administrado: la apertura directa debe confirmarse en Chrome/Edge del usuario. Cesium y mapas base necesitan Internet. No se desplegó GitHub Pages ni se modificó `main`.
+
+## Catálogo operativo global de las 18 plazas
+
+Se amplió el mismo importador, sin crear motores por plaza ni publicar los datos. Los dos HTML descargables y el visor web comparten catálogo, validación de expresiones por entidad, controles de subcapas y diagnóstico global privado.
+
+- 62 pruebas unitarias y 12 espaciales aprobadas. Se incluyen correspondencias para las 18 plazas y dos ámbitos, errores/ambigüedades/exclusiones, campos faltantes, geometrías incompatibles, conservación de entradas y separación de disponibilidad, pintura y certificación. El worker continúa tras un fallo de pintura y rechaza metadatos como capas; no lee internos.
+- Lote automatizado Chromium sobre el HTML descargable: inventario de 1.255 archivos sintéticos, 36 catálogos, 684 comprobaciones de pintura, 144 archivos internos sin leer, un error JSON previsto y registrado. Activación/liberación desde el catálogo en cada una de las 18 plazas; descarga y comprobación del informe global único. Se mantienen las pruebas de cancelación/reimportación, memoria, inspector, cuota, restauración y borrado.
+- Carpeta privada pequeña: las dos capas reales se vinculan y se validan automáticamente; se mantienen activación simultánea, selección de celda y comparación exacta con los atributos originales. No acredita datos reales de las otras 17 plazas.
+- Compilación reproducible de los tres artefactos generados por SHA-256. Revisión de privacidad antes del commit. Los informes privados descargados por el usuario no forman parte del repositorio.
+
+El conjunto corporativo completo continúa exclusivamente en la computadora del usuario: su cobertura efectiva se obtendrá al seleccionar esa carpeta, no se presume a partir de la prueba sintética. Las subcapas de referencia no encontradas se informan sin declararlas requisitos obligatorios. No se certifican resultados ni calidad visual de capas que no se han dibujado. Se mantienen los límites y pendientes de ZIP, apertura `file://` en el navegador del usuario e ion autenticado; sin despliegue ni cambios en `main`.

@@ -17,11 +17,36 @@ export async function runFolderSmoke({page,baseUrl,requests}){
   await page.locator('#folder-input').setInputFiles(process.env.FOLDER_TEST_PATH);
   await page.waitForFunction(()=>document.getElementById('folder-status').textContent.includes('Inventario terminado'),null,{timeout:120000});
   await page.waitForFunction(()=>document.getElementById('folder-reference-status').textContent.includes('subcapas'));
+  await page.waitForFunction(()=>document.getElementById('folder-report-status').textContent.includes('Validación técnica por lotes terminada'),null,{timeout:120000});
   assert.match(await page.locator('#folder-count').textContent(),/1255 archivos inventariados/);
   assert.equal(await page.locator('#folder-plazas button').count(),18);
   assert.match(await page.locator('#folder-status').textContent(),/1 errores/);
   assert.equal(await page.locator('#capas fieldset').count(),0,'Inventario no dibuja geometrías');
   assert.equal(await page.evaluate(()=>globalThis.__originalExecuted),undefined);
+  assert.equal(await page.locator('#folder-coverage > details').count(),36,'Informe global de las 18 plazas y dos ámbitos');
+  // A single batch traverses the same automatic catalog for every official plaza.
+  const codes=await page.locator('#plaza option').evaluateAll(options=>options.map(o=>o.value));
+  for(const code of codes){
+    await page.selectOption('#plaza',code);
+    assert.equal(await page.locator('#folder-catalog input[type=checkbox]:enabled').count(),19,'Todas las variables no internas vinculadas automáticamente: '+code);
+    const control=page.locator('#folder-catalog input[data-catalog-path*="/V01/"]').first();
+    await control.check();await page.waitForFunction(()=>document.getElementById('folder-status').textContent.includes('Capa activa'),null,{timeout:120000});
+    assert.equal(await page.locator('#capas input[type=checkbox]:checked').count(),1);
+    await page.locator('#folder-catalog input[data-catalog-path*="/V01/"]').first().uncheck();
+    assert.equal(await page.locator('#capas fieldset').count(),0);
+  }
+  await page.locator('details').filter({has:page.locator('#folder-report')}).last().evaluate(e=>{e.open=true;});
+  const reportDownload=page.waitForEvent('download');await page.locator('#folder-report').click();const reportFile=await reportDownload;
+  const report=JSON.parse(await readFile(await reportFile.path(),'utf8'));
+  assert.equal(report.contexts.length,36);assert.equal(report.inventory.complete,true);assert.equal(report.totals.files,1255);
+  assert.equal(report.totals.styleValidationFailed,0);assert.equal(report.contexts.reduce((n,c)=>n+c.styleValidationPassed,0),684);
+  assert.equal(report.totals.excluded,144);assert.equal(report.totals.errors,1);
+  assert.equal(report.contexts.filter(c=>c.visualizationChecked===1).length,18);
+  assert.ok(report.contexts.every(c=>c.activatableFiles===19&&c.availableSublayers.length===19&&c.analysisCertification==='not-certified'));
+  assert.ok(report.layers.every(layer=>!JSON.stringify(layer.fields).includes('synthetic-JRZ')));
+  await page.selectOption('#plaza','JRZ');
+  console.log('PASS lote multiplaza: 36 catálogos automáticos, 18 plazas con activación/liberación desde catálogo, informe global único, exclusiones, errores y certificación separada.');
+
   await page.fill('#folder-search','synthetic_v15_jrz');
   const blocked=page.locator('#folder-rows details').first();await blocked.locator('summary').click();assert.equal(await blocked.locator('button').isDisabled(),true);
   assert.match(await blocked.textContent(),/contenido no leído/);

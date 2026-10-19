@@ -14,7 +14,7 @@ export function classifyPath(path) {
   const blocked=variable&&/^V1[5-8]$/.test(variable);
   return {plaza,scope,variable,relative:relative.join('/'),status:blocked?'internal-excluded':!scope?'unrecognized-scope':!variable?'base-or-metadata':'recognized'};
 }
-export async function inspectFile(file,{signal,onBytes=()=>{},collect=false}={}) {
+export async function inspectFile(file,{signal,onBytes=()=>{},collect=false,onFeature=()=>{}}={}) {
   if(file.size>MAX_SCAN_BYTES) return {kind:'size-limit',renderable:false,reason:'Supera el límite de inventario por archivo (128 MiB); campos no leídos.'};
   let count=0,type,crs; const fields=Object.create(null),geometries=Object.create(null); const features=collect?[]:null;
   let coordinateError=false,unsafeNumbers=false; let rootName;
@@ -51,6 +51,7 @@ export async function inspectFile(file,{signal,onBytes=()=>{},collect=false}={})
       if(!stats.types.includes(kind))stats.types.push(kind);if(attribute===null)stats.nulls++;
       if(typeof attribute==='number'&&(!Number.isFinite(attribute)||Number.isInteger(attribute)&&!Number.isSafeInteger(attribute)))unsafeNumbers=true;
     }
+    onFeature(value);
     if(collect)features.push(value);
   };
   const reader=file.stream().getReader();const decoder=new TextDecoder('utf-8',{fatal:true});let bytes=0;
