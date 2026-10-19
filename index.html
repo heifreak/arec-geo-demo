@@ -1,469 +1,91 @@
-
 <!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport"
-        content="width=device-width, initial-scale=1">
-
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
   <title>AREC GEO | Visor Territorial 3D</title>
-
-  <!-- CesiumJS -->
   <script src="https://cesium.com/downloads/cesiumjs/releases/1.146/Build/Cesium/Cesium.js"></script>
-
-  <link rel="stylesheet"
-        href="https://cesium.com/downloads/cesiumjs/releases/1.146/Build/Cesium/Widgets/widgets.css">
-
-  <style>
-    * {
-      box-sizing: border-box;
-    }
-
-    html, body {
-      width: 100%;
-      height: 100%;
-      margin: 0;
-      padding: 0;
-      overflow: hidden;
-      font-family: Arial, sans-serif;
-    }
-
-    #cesiumContainer {
-      position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-    }
-
-    .panel {
-      position: absolute;
-      top: 15px;
-      left: 15px;
-      z-index: 100;
-
-      width: 280px;
-      max-width: calc(100vw - 65px);
-
-      background: rgba(12, 22, 35, 0.94);
-      color: white;
-
-      padding: 18px;
-      border-radius: 10px;
-
-      box-shadow: 0 4px 18px rgba(0,0,0,0.25);
-    }
-
-    .panel h1 {
-      font-size: 23px;
-      margin: 0 0 8px;
-      font-weight: bold;
-    }
-
-    .panel p {
-      font-size: 12px;
-      line-height: 1.6;
-      color: #d5dee8;
-      margin: 6px 0;
-    }
-
-    .subtitulo {
-      margin-bottom: 4px;
-    }
-
-    label {
-      display: block;
-      margin-top: 18px;
-      margin-bottom: 8px;
-      font-size: 13px;
-      font-weight: bold;
-    }
-
-    select {
-      width: 100%;
-      padding: 11px;
-
-      border-radius: 6px;
-      border: 1px solid #728396;
-
-      background: #ffffff;
-      color: #142131;
-
-      font-size: 14px;
-      cursor: pointer;
-    }
-
-    select:focus {
-      outline: 2px solid #58a6ff;
-      outline-offset: 2px;
-    }
-
-    .estado {
-      margin-top: 13px;
-      margin-bottom: 10px;
-      font-size: 12px;
-      color: #a9d5ff;
-      line-height: 1.5;
-    }
-
-    .separador {
-      height: 1px;
-      margin: 14px 0;
-      background: rgba(255,255,255,0.15);
-    }
-
-    .nota {
-      font-size: 11px;
-      color: #aab6c5;
-    }
-
-    @media (max-width: 600px) {
-      .panel {
-        top: 10px;
-        left: 10px;
-        width: 250px;
-        padding: 14px;
-      }
-
-      .panel h1 {
-        font-size: 20px;
-      }
-    }
-  </style>
+  <link rel="stylesheet" href="https://cesium.com/downloads/cesiumjs/releases/1.146/Build/Cesium/Widgets/widgets.css">
+  <link rel="stylesheet" href="./src/styles.css">
 </head>
-
 <body>
-
-  <!-- VISOR 3D -->
-  <div id="cesiumContainer"></div>
-
-  <!-- PANEL PRINCIPAL -->
-  <div class="panel">
-
-    <h1>AREC GEO</h1>
-
-    <p class="subtitulo">
-      Visor de inteligencia territorial 3D
-    </p>
-
-    <p>
-      18 plazas oficiales · Grupo RUBA
-    </p>
-
-    <label for="plaza">
-      Seleccionar plaza
-    </label>
-
-    <select id="plaza"></select>
-
-    <div class="estado" id="estado">
-      Preparando visor...
+  <div id="cesiumContainer" aria-label="Visor territorial Cesium 3D"></div>
+  <header class="topbar">
+    <div class="brand"><strong>AREC <span>GEO</span></strong><small>INTELIGENCIA TERRITORIAL · 3D</small></div>
+    <div class="plaza-controls">
+      <label for="plaza">Plaza oficial <select id="plaza" aria-label="Seleccionar plaza"></select></label>
+      <label for="buscar">Buscar plaza <input id="buscar" type="search" placeholder="Nombre o código" autocomplete="off"></label>
+      <label for="scope">Ámbito territorial<select id="scope"><option value="city">Ciudad</option><option value="municipality">Municipio central</option><option value="metro_analysis">Metrópoli · análisis</option><option value="metro_official">Metrópoli · oficial</option></select></label>
     </div>
-
-    <div class="separador"></div>
-
-    <p>
-      Navega, acerca, gira e inclina
-      el mapa para explorar el territorio.
-    </p>
-
-    <p class="nota">
-      Versión demostrativa 3D.
-      Capas territoriales en preparación.
-    </p>
-
-  </div>
-
-  <script>
-
-    // ===========================================
-    // 1. CONFIGURACIÓN GENERAL
-    // ===========================================
-
-    const CONFIG = {
-      alturaEnfoque: 55000,
-      inclinacion: -55,
-      duracionVuelo: 2.0
-    };
-
-
-    // ===========================================
-    // 2. CREACIÓN DEL VISOR CESIUM
-    // ===========================================
-
-    const viewer = new Cesium.Viewer(
-      "cesiumContainer",
-      {
-        baseLayer: new Cesium.ImageryLayer(
-          new Cesium.OpenStreetMapImageryProvider({
-            url: "https://tile.openstreetmap.org/",
-            maximumLevel: 18
-          })
-        ),
-
-        terrainProvider:
-          new Cesium.EllipsoidTerrainProvider(),
-
-        baseLayerPicker: false,
-        geocoder: false,
-        animation: false,
-        timeline: false,
-        navigationHelpButton: true,
-
-        homeButton: true,
-        sceneModePicker: true,
-        fullscreenButton: true,
-
-        selectionIndicator: true,
-        infoBox: true
-      }
-    );
-
-
-    // ===========================================
-    // 3. CATÁLOGO DE LAS 18 PLAZAS
-    // ===========================================
-
-    // Coordenadas de referencia urbana.
-    // Formato: [Nombre, Longitud, Latitud]
-    // Delicias no se incluye.
-
-    const PLAZAS = {
-
-      JRZ: [
-        "Ciudad Juárez",
-        -106.4245,
-        31.6904
-      ],
-
-      CHH: [
-        "Chihuahua",
-        -106.0691,
-        28.6320
-      ],
-
-      SLT: [
-        "Saltillo",
-        -100.9950,
-        25.4232
-      ],
-
-      TOR: [
-        "Torreón",
-        -103.4068,
-        25.5428
-      ],
-
-      MTY: [
-        "Monterrey",
-        -100.3161,
-        25.6866
-      ],
-
-      HMO: [
-        "Hermosillo",
-        -110.9559,
-        29.0729
-      ],
-
-      OBR: [
-        "Ciudad Obregón",
-        -109.9408,
-        27.4864
-      ],
-
-      MXL: [
-        "Mexicali",
-        -115.4523,
-        32.6245
-      ],
-
-      TIJ: [
-        "Tijuana",
-        -117.0382,
-        32.5149
-      ],
-
-      GDL: [
-        "Guadalajara",
-        -103.3496,
-        20.6597
-      ],
-
-      QRO: [
-        "Querétaro",
-        -100.3899,
-        20.5888
-      ],
-
-      VER: [
-        "Veracruz",
-        -96.1342,
-        19.1738
-      ],
-
-      LEO: [
-        "León",
-        -101.6840,
-        21.1220
-      ],
-
-      PUE: [
-        "Puebla",
-        -98.2063,
-        19.0414
-      ],
-
-      TOL: [
-        "Toluca",
-        -99.6557,
-        19.2826
-      ],
-
-      CAN: [
-        "Cancún",
-        -86.8515,
-        21.1619
-      ],
-
-      SLP: [
-        "San Luis Potosí",
-        -100.9855,
-        22.1565
-      ],
-
-      AGS: [
-        "Aguascalientes",
-        -102.2916,
-        21.8853
-      ]
-
-    };
-
-
-    // ===========================================
-    // 4. ELEMENTOS DE INTERFAZ
-    // ===========================================
-
-    const selector =
-      document.getElementById("plaza");
-
-    const estado =
-      document.getElementById("estado");
-
-
-    // ===========================================
-    // 5. CREAR SELECTOR AUTOMÁTICAMENTE
-    // ===========================================
-
-    for (const [codigo, datos] of
-      Object.entries(PLAZAS)) {
-
-      const opcion =
-        document.createElement("option");
-
-      opcion.value = codigo;
-
-      opcion.textContent =
-        `${datos[0]} (${codigo})`;
-
-      selector.appendChild(opcion);
-
-    }
-
-
-    // ===========================================
-    // 6. CÁMARA CORREGIDA
-    // CENTRAR LA CIUDAD EN PANTALLA
-    // ===========================================
-
-    function irAPlaza(codigo) {
-
-      const datos = PLAZAS[codigo];
-
-      if (!datos) {
-        estado.textContent =
-          "No se encontró la plaza.";
-        return;
-      }
-
-      const nombre = datos[0];
-      const longitud = datos[1];
-      const latitud = datos[2];
-
-      estado.textContent =
-        `Explorando: ${nombre}`;
-
-      // Punto real que la cámara debe mirar.
-      const centro = Cesium.Cartesian3.fromDegrees(
-        longitud,
-        latitud,
-        0
-      );
-
-      // Esfera centrada en la ciudad.
-      const objetivo = new Cesium.BoundingSphere(
-        centro,
-        1
-      );
-
-      // La cámara se coloca respecto del objetivo,
-      // no respecto de una altura vertical fija.
-      const orientacion = new Cesium.HeadingPitchRange(
-        0,
-        Cesium.Math.toRadians(
-          CONFIG.inclinacion
-        ),
-        CONFIG.alturaEnfoque
-      );
-
-      viewer.camera.flyToBoundingSphere(
-        objetivo,
-        {
-          offset: orientacion,
-          duration: CONFIG.duracionVuelo
-        }
-      );
-
-    }
-
-
-    // ===========================================
-    // 7. CAMBIO DE PLAZA
-    // ===========================================
-
-    selector.addEventListener(
-      "change",
-      function() {
-        irAPlaza(selector.value);
-      }
-    );
-
-
-    // ===========================================
-    // 8. BOTÓN HOME
-    // REGRESAR A CIUDAD JUÁREZ
-    // ===========================================
-
-    viewer.homeButton.viewModel.command.beforeExecute
-      .addEventListener(function(evento) {
-
-        evento.cancel = true;
-
-        selector.value = "JRZ";
-        irAPlaza("JRZ");
-
-      });
-
-
-    // ===========================================
-    // 9. ARRANQUE DEL VISOR
-    // ===========================================
-
-    selector.value = "JRZ";
-
-    irAPlaza("JRZ");
-
-  </script>
-
+    <div class="context"><span class="badge">DEMOSTRACIÓN PÚBLICA</span><p id="estado" role="status">Preparando visor…</p><small id="resultados-busqueda" aria-live="polite">18 plazas oficiales · Sin Delicias</small><button id="toggle-inspector" aria-expanded="false">Inspector / estatus</button></div>
+  </header>
+  <aside class="panel left-panel" aria-label="Fuentes y herramientas">
+    <p class="eyebrow">EXPLORACIÓN</p><h1>Territorio en perspectiva</h1>
+    <p class="muted">Navega, acerca, gira e inclina el mapa. Datos territoriales sujetos a revisión de publicación.</p>
+    <details open><summary>Escena 3D</summary>
+      <label class="check"><input id="base-map" type="checkbox" checked> Mapa base OpenStreetMap</label>
+      <p id="base-map-status" class="muted" role="status">Teselas sujetas a disponibilidad y política de OpenStreetMap.</p>
+      <label class="check"><input id="terrain" type="checkbox"> Relieve · World Terrain</label>
+      <p id="terrain-status" class="muted" role="status">Elipsoide activo. Relieve pendiente de token ion.</p>
+      <label class="check"><input id="buildings" type="checkbox"> Edificios · OSM Buildings</label>
+      <p id="buildings-status" class="muted" role="status">Edificios desactivados. Cobertura según proveedor.</p>
+      <button id="verify-3d" type="button">Comprobar vista 3D actual</button>
+      <pre id="verify-3d-status" role="status">Sin comprobación de terreno ni edificios reales.</pre>
+      <div class="button-grid"><button id="view-world" type="button">Ver globo</button><button id="view-plazas" type="button">Ver las 18 plazas</button></div>
+      <details class="subdetails"><summary>Conectar Cesium ion</summary>
+        <p class="muted">Usa solo un token de visualización con permiso assets:read. Se conserva en memoria durante esta sesión; no se guarda ni se envía al repositorio.</p>
+        <form id="ion-form"><label for="ion-token">Token de visualización <input id="ion-token" type="password" autocomplete="off" spellcheck="false"></label><button type="submit">Aplicar a esta sesión</button></form>
+        <p id="ion-status" class="muted" role="status">Sin token configurado. No uses credenciales privadas.</p>
+      </details>
+    </details>
+    <details><summary>Ir a coordenadas</summary>
+      <form id="ir-coordenadas"><label for="longitud">Longitud WGS84<input id="longitud" type="number" min="-180" max="180" step="any" required></label><label for="latitud">Latitud WGS84<input id="latitud" type="number" min="-90" max="90" step="any" required></label><button type="submit">Enfocar ubicación</button></form>
+      <p class="muted">Búsqueda de direcciones pendiente de proveedor autorizado.</p>
+    </details>
+    <details><summary>Referencia privada · árbol original</summary>
+      <form id="reference-form">
+        <label for="reference-file">Paquete de referencia revisado (JSON)<input id="reference-file" type="file" accept=".json" required></label>
+        <label class="check"><input id="reference-consent" type="checkbox" required> Autorizado para revisar en esta sesión privada</label>
+        <button type="submit">Leer referencia en memoria</button>
+      </form>
+      <button id="reference-clear" type="button">Retirar referencia</button>
+      <p id="reference-status" class="muted" role="status">El desarrollador prepara este paquete de datos; no ejecutes ni cargues el HTML original como aplicación.</p>
+      <label for="layer-search">Buscar variable o subcapa<input id="layer-search" type="search" placeholder="Buscar en la referencia cargada"></label>
+      <div id="reference-tree"></div>
+    </details>
+    <details open><summary>Capas territoriales · ámbito actual</summary><p class="muted">Cambiar de ámbito retira sus entidades cargadas. No se sustituyen capas metropolitanas por capas de ciudad.</p><div id="capas" aria-live="polite">Leyendo catálogo…</div></details>
+    <details><summary>Muestra privada · solo sesión</summary>
+      <p class="muted">Los archivos se leen en este navegador; no se suben al servidor. El descriptor lo preparará el desarrollador desde la referencia V15. No sustituye la autorización para publicar.</p>
+      <form id="session-form">
+        <label for="session-geojson">Muestra GeoJSON de la plaza seleccionada<input id="session-geojson" type="file" accept=".geojson,.json" required></label>
+        <label for="session-descriptor">Descriptor revisado (opcional si elegiste subcapa en la referencia)<input id="session-descriptor" type="file" accept=".json"></label>
+        <label class="check"><input id="session-consent" type="checkbox" required> Autorizada para revisión en esta sesión privada</label>
+        <button type="submit">Preparar muestra en memoria</button>
+      </form>
+      <button id="session-clear" type="button">Retirar muestras de sesión</button>
+      <p id="session-status" class="muted" role="status">Sin muestras de sesión. Las muestras no se guardan en almacenamiento local ni IndexedDB.</p>
+    </details>
+    <details open><summary>Dibujo y medición</summary>
+      <div class="button-grid"><button id="draw-point">Punto</button><button id="draw-line">Línea / distancia</button><button id="draw-polygon">Polígono / área</button><button id="draw-finish">Terminar</button><button id="draw-clear">Limpiar dibujos</button></div>
+      <p id="drawing-status" role="status">Dibujos locales; no se guardan ni se publican.</p>
+      <p class="muted">Mediciones esféricas aproximadas sobre polígonos simples. No son superficies catastrales ni mediciones sobre el relieve.</p>
+    </details>
+    <details><summary>Capacidades pendientes</summary><p class="muted">Geometrías metropolitanas, variables y resultados: requieren datos y revisión de referencias. T1/T2/T3, multicriterio y Balance de Tierra REC: pendientes de reglas y validación. No se ejecutan cálculos de oportunidad.</p></details>
+  </aside>
+  <aside class="panel right-panel" aria-label="Inspector territorial y estatus">
+    <p class="eyebrow">INTELIGENCIA TERRITORIAL</p><h2>Inspector</h2>
+    <p class="muted">Selecciona un elemento del mapa. Si coinciden varias capas, elige un elemento.</p>
+    <details open><summary>Fuente, leyenda y metodología</summary><h3 id="selected-layer">Ninguna</h3><label for="selected-opacity">Intensidad de la capa cargada<input id="selected-opacity" type="range" min="0" max="1" step="0.05" value="1" disabled></label><div id="active-layers" class="button-grid" aria-label="Capas activas"></div><div id="layer-legend"></div><pre id="layer-method"></pre></details>
+    <div id="coincidentes" class="button-grid"></div><div id="cell-inspection" aria-live="polite"></div>
+    <div id="cell-comparison" aria-live="polite"></div>
+    <pre id="atributos">Selecciona una entidad de una capa cargada.</pre>
+    <details open class="report"><summary>Estatus de la plaza</summary>
+      <p class="muted">Inventario y resúmenes de atributos de capas cargadas, incluidas muestras privadas si las activas. No equivale a cobertura completa de la plaza.</p>
+      <dl id="summary"></dl>
+      <div class="button-grid"><button id="export-csv">Exportar estatus CSV</button><button id="print-report">Imprimir / guardar PDF</button></div>
+    </details>
+  </aside>
+  <script type="module" src="./src/viewer.bundle.js"></script>
 </body>
 </html>

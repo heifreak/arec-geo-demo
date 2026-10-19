@@ -1,0 +1,17 @@
+{
+  "name": "arec-geo-demo",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test",
+    "start": "python3 -m http.server 8000 --bind 127.0.0.1",
+    "test:browser": "node tools/browser-smoke.mjs",
+    "build:preview": "node tools/build-private-preview.mjs"
+  },
+  "devDependencies": {
+    "@streamparser/json": "0.0.22",
+    "acorn": "8.15.0",
+    "esbuild": "0.25.12",
+    "playwright-core": "1.64.1"
+  }
+}
